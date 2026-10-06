@@ -118,8 +118,9 @@
 
 <div class="toolbar no-print">
   <strong>Herramienta A3 DiDe</strong>
-  <span class="hint">Trae de ejemplo el A3 de SincLE. Tocá «Empezar uno en blanco» para el tuyo; hacé clic en cualquier texto para editarlo; se guarda solo en este navegador.</span>
+  <span class="hint">Trae de ejemplo el A3 de SincLE. «Importar Concepto» lo prellena con las respuestas de la encuesta; «Empezar uno en blanco» lo vacía. Hacé clic en cualquier texto para editarlo; se guarda solo en este navegador.</span>
   <span class="grow"></span>
+  <button type="button" id="btn-import">Importar Concepto (CSV o JSON)</button>
   <button type="button" id="btn-blank">Empezar uno en blanco</button>
   <button type="button" id="btn-print">Imprimir / Guardar PDF</button>
   <button type="button" id="btn-save">Descargar mi versión (.html)</button>
@@ -397,6 +398,42 @@ document.getElementById('btn-blank').addEventListener('click',function(){
   var v=document.getElementById('f-version');if(v){v.textContent='0.1';}
   var b=document.querySelector('.body');if(b){b.dispatchEvent(new Event('input',{bubbles:true}));}
 });
+
+(function(){
+  var MAPA={'c-seg':[8,18],'c-prob':[17,10,9],'c-valor':[21],'c-sol':[16],'c-canal':[25,26,19],'c-ingr':[13,15,27],'c-cost':[22,23],'c-metr':[20,11],'c-vent':[15,14]};
+  function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();}
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function parseCSV(t){t=t.replace(/^﻿/,'');var first=t.split(/\r?\n/)[0]||'',sep=(first.split(';').length>first.split(',').length)?';':',',rows=[],row=[],cell='',q=false;
+    for(var i=0;i<t.length;i++){var ch=t[i];if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell='';}
+      else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell='';}else cell+=ch;}
+    if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(function(r){return r.join('').trim();});}
+  function colToQ(hd){var x=norm(hd),m=x.match(/^(\d{1,2})\s*[.)]/);if(m&&+m[1]>=1&&+m[1]<=32)return +m[1];return x==='nombre'?1:0;}
+  function personasDe(nombre,texto){
+    if(/\.json$/i.test(nombre)){var o=JSON.parse(texto);if(!o.personas)throw new Error('El JSON no es de la herramienta Concepto.');
+      return o.personas.map(function(p){return {nombre:p.nombre||(p.r&&p.r[1])||'',r:p.r||{}};});}
+    var rows=parseCSV(texto),map=rows[0].map(colToQ),byN={};if(!map.some(Boolean))throw new Error('El CSV no tiene columnas de la encuesta de Concepto.');
+    rows.slice(1).forEach(function(r){var res={};map.forEach(function(n,i){if(n&&String(r[i]||'').trim())res[n]=String(r[i]).trim();});var k=norm(res[1])||('#'+Object.keys(byN).length);
+      byN[k]=byN[k]||{nombre:res[1]||'',r:{}};Object.assign(byN[k].r,res);});
+    return Object.keys(byN).map(function(k){return byN[k];});}
+  var inp=document.createElement('input');inp.type='file';inp.accept='.csv,.json';inp.multiple=true;inp.style.display='none';document.body.appendChild(inp);
+  document.getElementById('btn-import').addEventListener('click',function(){inp.click();});
+  inp.addEventListener('change',function(){var files=Array.prototype.slice.call(inp.files);inp.value='';if(!files.length)return;
+    Promise.all(files.map(function(f){return f.text().then(function(t){return personasDe(f.name,t);});})).then(function(listas){
+      var todas={};listas.forEach(function(L){L.forEach(function(p){var k=norm(p.nombre)||('#'+Object.keys(todas).length);todas[k]=todas[k]||{nombre:p.nombre,r:{}};Object.assign(todas[k].r,p.r);});});
+      var P=Object.keys(todas).map(function(k){return todas[k];});if(!P.length)return alert('No encontré respuestas.');
+      if(!confirm('Se reemplaza el contenido de las nueve cajas con las respuestas de '+P.length+' persona(s). ¿Seguro?'))return;
+      var varias=P.length>1;
+      Object.keys(MAPA).forEach(function(cls){var b=document.querySelector('.cell.'+cls+' .body');if(!b)return;var html='';
+        MAPA[cls].forEach(function(n){P.forEach(function(p){var v=String(p.r[n]||'').trim();if(!v)return;
+          html+='<p><b>[P'+n+(varias&&p.nombre?' · '+esc(p.nombre):'')+']</b> '+esc(v).replace(/\n/g,'<br>')+'</p>';});});
+        b.innerHTML=html;});
+      var nom=String((P.find(function(p){return p.r[7];})||{r:{}}).r[7]||'').split(/[.\n]/)[0];
+      var ti=document.getElementById('f-titulo');if(ti&&nom)ti.textContent='A3 — '+nom;
+      var au=document.getElementById('f-autor');if(au)au.textContent=P.map(function(p){return p.nombre;}).filter(Boolean).join(', ');
+      var b0=document.querySelector('.body');if(b0)b0.dispatchEvent(new Event('input',{bubbles:true}));
+      alert('Listo: las nueve cajas quedaron prellenadas. Cada texto dice de qué pregunta sale ([P8] = pregunta 8). Ahora toca destilar: una caja no debería pasar de cinco líneas.');
+    }).catch(function(e){alert('No se pudo importar: '+e.message);});});
+})();
 /* EXTRA-FIN */
 </script>
 </body>
