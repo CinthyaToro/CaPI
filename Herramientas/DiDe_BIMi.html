@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIMi DiDe</title>
+<!--
+  HERRAMIENTA "BIMi — BIM DE INVESTIGACIÓN" DiDe — v0.1 (06/10/2026) — Cinthya Toro · CaPI / DiDe
+  Un solo archivo, sin dependencias. Paso 8 de la ruta DiDe:
+    Concepto → A3 → Flujo del proyecto (→ Ruta de fabricación) → Ishikawa → AMFE y plan de control → WBS → Diccionario → BIMi
+  Los tres pilares del BIM aplicados a un desarrollo de laboratorio:
+    - Jerarquización: el árbol de la WBS (no se vuelve a cargar).
+    - Visualización: cada globito responde cinco preguntas (¿Para qué sirve? ¿Cómo se usa? ¿Cómo se reproduce?
+      ¿Por qué es así? ¿Cuánto se sabe?), armadas solas con lo que exportaron las herramientas anteriores, y filtradas
+      por el semáforo de quien lee (autores, grupo o público). Cada capa admite un texto propio.
+    - Visibilización: registro maestro de documentos (cada JSON importado entra solo, con su control documental; los
+      documentos de afuera se ENLAZAN por URL, nunca se copian) y lista de materiales.
+  Regla PI → semáforo: secreto y patente → rojo · sin definir → amarillo · público → verde (se puede cambiar por
+  globito). Lo que no se puede ver se nombra sin revelarse. Un contenido sale de una fuente (WBS, flujo, Ishikawa, AMFE,
+  A3): se muestra sólo si el semáforo de esa fuente y el del globito lo permiten.
+  Importar (se reconoce solo; se pueden elegir varios archivos juntos): .json de las herramientas WBS (obligatorio,
+  primero), Flujo del proyecto, Ishikawa, AMFE (de proceso o de diseño), A3 y Concepto, o un .json de esta herramienta.
+  FORMATO JSON
+  { "herramienta": "DiDe BIMi", "version_formato": 1,
+    "doc": { codigo, version, fecha, estado, semaforo, titulo, acronimo, elaboro, reviso, aprobo, autores, origen },
+    "fuentes": { wbs, flujo, ishikawa, amfe: [ … ], a3, concepto },      (los JSON importados, tal cual)
+    "documentos": [ { id, codigo, titulo, tipo, version, estado (en_curso|compartido|publicado|archivado), semaforo,
+                      elaboro, reviso, aprobo, url, globitos: [ids], origen (importado|externo), fuente } ],
+    "materiales": [ { id, nombre, tipo (componente|insumo|equipo|software), cantidad, unidad, costo, moneda,
+                      proveedor, url, globitos: [ids], semaforo } ],
+    "globitos": { "<id>": { madurez (hipotesis|laboratorio|validado|transferido), trl, semaforo, textos: {
+                  para, uso, reproduce, porque, cuanto } } } }
+  Impresión: A4 vertical, márgenes ISO 5457, encabezado y pie en cada hoja con "Página n de N" (Chrome o Edge 131+).
+  …html#doc:reproduce:verde abre el documento de una pregunta para una vista.
+-->
+<style>
+  :root{color-scheme:light;
+    --ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--muted:#615d54;--line:#cfc9b8;--teal:#1f6b62;--warn:#b58500;--nd:#b3261e;--ok:#2e7d32;--hl:#fffbe8;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif)}
+  button,select,input,textarea{font:inherit}
+  .bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 18px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:13px}
+  .bar .grow{flex:1}
+  .bar button,.bar label.btn,.bar select{font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .bar button.ghost{background:transparent;color:#fff}
+  .bar button[aria-pressed="true"]{background:#ffd37a;border-color:#ffd37a}
+  .bar input[type=file]{display:none}
+  .page{max-width:1600px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .headdoc{background:var(--paper);border:1px solid var(--ink);padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+  .head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;flex-wrap:wrap}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0 0 3px}
+  h1{font-size:23px;line-height:1.2;margin:0}
+  [data-f]{outline:none;border-radius:3px}
+  body.edit [data-f]{background:var(--hl);border-bottom:1px dotted var(--teal)}
+  .sema{border:2px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px;min-width:230px;font-family:var(--sans)}
+  .ctrl{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--ink);font-size:13px}
+  .ctrl div{padding:5px 8px;border-right:1px solid var(--ink);min-width:0}.ctrl div:last-child{border-right:0}
+  .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:-1px;flex:0 0 auto}
+  .hint{color:var(--muted);font-size:12.5px;font-family:var(--sans)}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--sans);font-size:13.5px}
+  .tabs button{border:1px solid var(--ink);background:var(--paper);border-radius:5px 5px 0 0;padding:6px 12px;cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+  .lector{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-family:var(--sans);font-size:13.5px;background:var(--paper);border:1px solid var(--ink);border-radius:6px;padding:8px 12px}
+  .lector button{border:1.5px solid var(--line);background:#fff;border-radius:16px;padding:4px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .lector button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:#fff}
+
+  .view{display:none;background:var(--paper);border:1px solid var(--ink);padding:14px 18px}
+  .view.current{display:block}
+  .view h2{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
+  .explorar{display:grid;grid-template-columns:minmax(260px,1fr) minmax(0,2fr);gap:14px}
+  .arbol{border:1px solid var(--line);border-radius:5px;max-height:75vh;overflow:auto;font-family:var(--sans);font-size:13px}
+  .arbol div{display:flex;gap:6px;align-items:center;padding:3px 8px;cursor:pointer;border-bottom:1px solid #f1ede2}
+  .arbol div:hover{background:var(--hl)}.arbol div.sel{background:#e9f2f0;font-weight:600}
+  .arbol .acr{font-family:var(--mono);font-size:11.5px;color:var(--teal);white-space:nowrap}
+  .arbol .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{font-family:var(--mono);font-size:10px;border:1px solid var(--line);border-radius:8px;padding:0 5px;color:var(--muted);white-space:nowrap}
+  .crit{color:var(--nd);font-size:12px}
+  .ficha{font-family:var(--sans);font-size:14px;line-height:1.45}
+  .ficha h3{margin:0 0 2px;font-size:18px;font-family:var(--serif)}
+  .capa{border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:5px;padding:8px 12px;margin:10px 0;break-inside:avoid}
+  .capa h4{margin:0 0 6px;font-size:14.5px;color:var(--teal)}
+  .capa p{margin:0 0 5px}.capa ul{margin:0 0 5px;padding-left:18px}.capa li{margin:2px 0}
+  .capa .propio{background:#f7f4ea;border-left:3px solid var(--ink);padding:4px 8px;margin:0 0 6px}
+  .capa .falta{color:var(--warn);font-weight:600}
+  .capa .oculto{color:var(--muted);font-style:italic}
+  .fuente{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--sans)}
+  th,td{text-align:left;vertical-align:top;padding:4px 6px;border:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:#faf8f2}
+  td.falta{color:var(--warn);font-weight:600}td.acr{font-family:var(--mono);white-space:nowrap}
+  tbody tr{cursor:pointer}tbody tr:hover{background:var(--hl)}
+  .tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--sans);font-size:13px;margin:0 0 10px}
+  .tools select{border:1px solid var(--line);border-radius:4px;padding:4px 8px;background:var(--paper)}
+  .docpreg h3{font-family:var(--serif);font-size:16px;margin:12px 0 2px}
+  .below{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px}
+  .box{background:var(--paper);border:1px solid var(--ink);border-radius:5px;padding:10px 13px;font-size:14px;line-height:1.45;min-width:0;font-family:var(--sans)}
+  .box h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px;color:var(--teal)}
+  .box ol{margin:0;padding-left:20px}.box li{margin:3px 0}.box li a{color:var(--ink);text-decoration:underline dotted}.box p{margin:0 0 6px}
+  .rotulo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1.5px solid var(--ink);font-size:11.5px;font-family:var(--sans);margin-bottom:10px}
+  .rotulo div{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:3px 6px;min-width:0}
+  .rotulo div:nth-child(4n){border-right:0}.rotulo div:nth-last-child(-n+4){border-bottom:0}.rotulo .wide{grid-column:span 3}
+  .print-only{display:none}
+  dialog{border:1px solid var(--ink);border-radius:8px;padding:0;max-width:760px;width:95vw;font-family:var(--sans)}
+  dialog::backdrop{background:rgba(20,18,14,.45)}
+  .dlg-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .dlg-h h3{margin:0;font-size:17px;line-height:1.3}
+  .dlg-b{padding:12px 16px;display:grid;gap:9px;font-size:14px;max-height:70vh;overflow:auto;white-space:pre-line}
+  .dlg-b label{display:grid;gap:3px;font-size:12px;color:var(--muted);white-space:normal}
+  .dlg-b input,.dlg-b select,.dlg-b textarea{border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--ink);font-size:14px;width:100%}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .dlg-f{padding:10px 16px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+  .dlg-f button{padding:6px 12px;border-radius:4px;border:1px solid var(--ink);background:#fff;cursor:pointer}
+  .dlg-f button.pri{background:var(--ink);color:#fff}.dlg-f button.del{border-color:var(--nd);color:var(--nd);margin-right:auto}
+  .only-edit{display:none!important} body.edit .only-edit{display:inline-block!important}
+  @media (max-width:860px){.explorar,.below{grid-template-columns:1fr}.ctrl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media print{
+    body{background:#fff}
+    .bar,.headdoc,.tabs,.lector,.tools,.below,dialog,.no-print,.arbol{display:none!important}
+    .print-only{display:grid}
+    .page{display:block;padding:0;max-width:none}
+    .view{display:none!important;border:0;padding:0}.view.current{display:block!important}
+    .explorar{display:block}
+    table{font-size:8.5pt}th{font-size:7pt}.capa{font-size:10pt}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="papel"></style>
+</head>
+<body>
+<div class="bar">
+  <strong>BIMi DiDe</strong>
+  <button type="button" id="b-edit" aria-pressed="false">Editar</button>
+  <span class="grow"></span>
+  <label class="btn" for="f-imp">Importar</label><input type="file" id="f-imp" accept=".json" multiple>
+  <select id="sel-exp" aria-label="Exportar">
+    <option value="">Exportar…</option>
+    <option value="json">Datos BIMi (.json)</option>
+    <option value="docs">Registro de documentos (.csv)</option>
+    <option value="mat">Lista de materiales (.csv)</option>
+    <option value="pi">Matriz de PI (.csv)</option>
+    <option value="md">Documento de la pregunta elegida (.md)</option>
+  </select>
+  <button type="button" id="b-print">Imprimir esta vista</button>
+  <button type="button" id="b-reset" class="ghost">Volver a los datos del archivo</button>
+</div>
+
+<main class="page">
+  <section class="headdoc" aria-label="Control documental">
+    <div class="head">
+      <div><p class="kicker">DiDe — Paso 8 · BIMi, BIM de investigación</p><h1 data-f="titulo"></h1></div>
+      <div class="sema" id="sema"><span class="k">Semáforo del BIMi</span><span class="dot" id="sema-dot"></span> <b id="sema-txt"></b>
+        <select id="sema-sel" class="only-edit" aria-label="Color del semáforo"><option value="rojo">rojo</option><option value="amarillo">amarillo</option><option value="verde">verde</option></select>
+        <br><span id="sema-desc" class="hint"></span></div>
+    </div>
+    <div class="ctrl">
+      <div><span class="k">Código</span><span data-f="codigo"></span></div>
+      <div><span class="k">Versión · estado</span><span data-f="version"></span> · <span data-f="estado"></span></div>
+      <div><span class="k">Autores</span><span data-f="autores"></span></div>
+      <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+      <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+      <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+    </div>
+    <p class="hint" style="margin:0">Origen: <span data-f="origen"></span></p>
+  </section>
+
+  <div class="lector" role="group" aria-label="Quién lee">
+    <b>Quién lee:</b>
+    <button type="button" data-v="rojo"><span class="dot" style="background:#b3261e"></span>Autores</button>
+    <button type="button" data-v="amarillo"><span class="dot" style="background:#b58500"></span>Grupo</button>
+    <button type="button" data-v="verde"><span class="dot" style="background:#2e7d32"></span>Público</button>
+    <span class="hint" id="lector-desc"></span>
+  </div>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Vistas"></nav>
+
+  <section class="view" data-view="explorar" aria-label="Explorar">
+    <div class="explorar"><div class="arbol" id="arbol"></div><div class="ficha" id="ficha"></div></div>
+  </section>
+  <section class="view" data-view="doc" aria-label="Documento por pregunta">
+    <div class="rotulo print-only" data-rot="BIMi — documento por pregunta"></div>
+    <div class="tools no-print"><label>Pregunta <select id="sel-preg"></select></label><span class="hint">Un documento para quien hace esa pregunta, filtrado por quién lee.</span></div>
+    <div id="docpreg" class="docpreg"></div>
+  </section>
+  <section class="view" data-view="docs" aria-label="Registro de documentos">
+    <div class="rotulo print-only" data-rot="BIMi — registro maestro de documentos"></div>
+    <h2>Registro maestro de documentos</h2>
+    <p class="hint no-print">Los documentos DiDe entran solos al importar sus JSON. Los de afuera (procedimientos, planos, código, especificaciones, informes) se agregan en «Editar» y se <b>enlazan</b>: el archivo nunca se copia. Estados según ISO 19650: en curso → compartido → publicado → archivado.</p>
+    <p class="no-print only-edit"><button type="button" id="b-doc">+ Documento externo</button></p>
+    <table><thead><tr><th>Código</th><th>Título</th><th>Tipo</th><th>Versión</th><th>Estado</th><th>Semáforo</th><th>Elaboró</th><th>Revisó</th><th>Aprobó</th><th>Enlace</th><th>Globitos</th></tr></thead><tbody id="t-docs"></tbody></table>
+  </section>
+  <section class="view" data-view="mat" aria-label="Lista de materiales">
+    <div class="rotulo print-only" data-rot="BIMi — lista de materiales"></div>
+    <h2>Lista de materiales y recursos</h2>
+    <p class="no-print only-edit"><button type="button" id="b-mat">+ Material</button></p>
+    <table><thead><tr><th>Material</th><th>Tipo</th><th>Cantidad</th><th>Costo</th><th>Proveedor</th><th>Hoja de datos</th><th>Globitos</th><th>Semáforo</th></tr></thead><tbody id="t-mat"></tbody></table>
+  </section>
+  <section class="view" data-view="pi" aria-label="Matriz de PI">
+    <div class="rotulo print-only" data-rot="BIMi — matriz de PI por globito"></div>
+    <h2>Matriz de PI por globito (insumo de la decisión de protección)</h2>
+    <table><thead><tr><th>Acrónimo</th><th>Globito</th><th>Tipo</th><th>PI</th><th>Semáforo</th><th>Crítico</th><th>Madurez</th><th>Documentos</th></tr></thead><tbody id="t-pi"></tbody></table>
+  </section>
+
+  <div class="below"><div class="box" id="preguntas"></div><div class="box" id="sintesis"></div></div>
+</main>
+
+<template id="tpl-rot">
+  <div class="wide"><span class="k">Título</span><span data-f="titulo"></span></div>
+  <div><span class="k">Código</span><b data-f="codigo"></b></div>
+  <div class="wide"><span class="k">Documento</span><span class="rot-diag"></span></div>
+  <div><span class="k">Para quién lee</span><span class="rot-lector"></span></div>
+  <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+  <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+  <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+  <div><span class="k">Versión · fecha</span><span data-f="version"></span> · <span data-f="fecha"></span></div>
+</template>
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <div class="dlg-h"><h3 id="dlg-t"></h3><button type="button" id="d-x" aria-label="Cerrar" style="border:0;background:none;font-size:20px;cursor:pointer">×</button></div>
+  <div class="dlg-b" id="dlg-b"></div><div class="dlg-f" id="dlg-f"></div>
+</dialog>
+
+<!-- DATOS: ejemplo resuelto (SincLE, público). Reemplazar por los del proyecto con «Importar». -->
+<script id="datos" type="application/json">
+{"herramienta":"DiDe BIMi","version_formato":1,"doc":{"codigo":"SincLE-BIMi-01","version":"0.1","fecha":"2026-10-06","estado":"Ejemplo resuelto · borrador","semaforo":"verde","titulo":"SincLE · Sincroniza la Luz para ver más allá de lo Evidente","acronimo":"SincLE","elaboro":"Claude, a pedido de Cinthya Toro","reviso":"—","aprobo":"—","autores":"Cinthya Toro","origen":"Ejemplo público de CaPI: las fuentes son los ejemplos de SincLE de cada herramienta; documentos externos y materiales sin enlace ni costo todavía (BIMi los pregunta)."},"fuentes":{"wbs":{"doc":{"codigo":"SincLE-WBS-01","version":"0.1","fecha":"2026-10-06","estado":"Ejemplo resuelto · borrador","semaforo":"verde","titulo":"SincLE · Sincroniza la Luz para ver más allá de lo Evidente","acronimo":"SincLE","elaboro":"Claude, a pedido de Cinthya Toro (árbol del flujo de Cinthya Toro)","reviso":"—","aprobo":"—","autores":"Cinthya Toro","origen":"Árbol armado desde el flujo SincLE-FP-01 (la decisión queda afuera). QUÉ y CÓMO tomados del A3 y del Concepto de SincLE. Ejemplo público de CaPI."},"nodos":[{"id":"root","acr":"SincLE","padre":"","nombre":"SincLE · Sincroniza la Luz para ver más allá de lo Evidente","que":"Sincronizar por hardware un láser y un espectrómetro LIBS que sólo funcionan como Master, con un retardo ajustable de microsegundos","como":"Planificar → determinar los requisitos → implementar → validar → entregar el PMV","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"e-pln","acr":"pln","padre":"root","nombre":"Planificación","que":"Saber qué se va a hacer y cómo se va a documentar","como":"Documentar el proyecto con DiDe","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n01","acr":"pln.dde","padre":"e-pln","nombre":"DiDe","que":"Documentar SincLE con el método DiDe","como":"Concepto → A3 → Flujo del proyecto → Ishikawa 6M → WBS → Diccionario → BIMi","descomponible":"si","tipo":"entrada","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n02","acr":"pln.dde.cnc","padre":"n01","nombre":"Concepto","que":"Producir el documento DiDe «Concepto»","como":"Herramienta Concepto","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"Concepto","origen":"Flujo SincLE-FP-01"},{"id":"n03","acr":"pln.dde.atr","padre":"n01","nombre":"A3","que":"Producir el documento DiDe «A3»","como":"Herramienta A3","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"A3","origen":"Flujo SincLE-FP-01"},{"id":"n04","acr":"pln.dde.flj","padre":"n01","nombre":"Flujo del proyecto","que":"Producir el documento DiDe «Flujo del proyecto»","como":"Herramienta Flujo del proyecto","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"Flujo del proyecto","origen":"Flujo SincLE-FP-01"},{"id":"n05","acr":"pln.dde.shk","padre":"n01","nombre":"Ishikawa 6M","que":"Producir el documento DiDe «Ishikawa 6M»","como":"Herramienta Ishikawa 6M","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"Ishikawa 6M","origen":"Flujo SincLE-FP-01"},{"id":"n06","acr":"pln.dde.wbs","padre":"n01","nombre":"WBS","que":"Producir el documento DiDe «WBS»","como":"Herramienta WBS","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"WBS","origen":"Flujo SincLE-FP-01"},{"id":"n07","acr":"pln.dde.dcc","padre":"n01","nombre":"Diccionario","que":"Producir el documento DiDe «Diccionario»","como":"Herramienta Diccionario","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"Diccionario","origen":"Flujo SincLE-FP-01"},{"id":"n08","acr":"pln.dde.bmi","padre":"n01","nombre":"BIMi","que":"Producir el documento DiDe «BIMi»","como":"Herramienta BIMi","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"BIMi","origen":"Flujo SincLE-FP-01"},{"id":"e-drq","acr":"drq","padre":"root","nombre":"Determinación de requisitos","que":"Saber qué tiene que cumplir el sincronizador","como":"Proteger a las personas y a los equipos → fijar la resolución temporal → permitir ajustar el retardo en cada experimento → dejarlo modular","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n10","acr":"drq.sgr","padre":"e-drq","nombre":"Seguridad","que":"Que ni las personas ni los equipos corran riesgo al conectar el láser","como":"Aislación galvánica con optoacopladores y componentes de protección; el láser sólo se habilita con sus propios interlocks","descomponible":"no","tipo":"entrada","critico":true,"pi":"publico","idef0":{"entradas":"Láser, espectrómetro y computadora","salidas":"Conexión sin unión eléctrica directa","controles":"Hojas de datos de los equipos; normas de seguridad láser del laboratorio","mecanismos":"Optoacopladores, protecciones"},"vmodel":{"criterio":"Sin conexión eléctrica directa entre el láser y la computadora","kpi":"Aislación medida en cada canal","test":"Prueba de aislación antes de conectar"},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n11","acr":"drq.rsl","padre":"e-drq","nombre":"Resolución de 1 microsegundo","que":"Que el retardo entre los dos disparos se fije con resolución de microsegundos","como":"Pulsos TTL generados por hardware (Arduino Mega) en dos pines; meta: entre 10 µs y 1 µs","descomponible":"no","tipo":"entrada","critico":true,"pi":"sin_definir","idef0":{"entradas":"Retardo pedido por el experimento","salidas":"Dos pulsos TTL separados por ese retardo","controles":"Osciloscopio calibrado","mecanismos":"Arduino Mega y hardware de acople"},"vmodel":{"criterio":"El retardo medido coincide con el programado dentro de la resolución buscada [a verificar]","kpi":"Diferencia entre el retardo medido y el programado (µs)","test":"Medición con osciloscopio en las dos salidas"},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n12","acr":"drq.dpt","padre":"e-drq","nombre":"Adaptativo","que":"Que cada experimento pueda elegir su retardo","como":"Retardo configurable desde Python, sin reprogramar el Arduino","descomponible":"no","tipo":"entrada","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n13","acr":"drq.mdl","padre":"e-drq","nombre":"Modular","que":"Que SincLE se pueda sumar a otros instrumentos del laboratorio","como":"Entradas y salidas TTL estándar con conectores coaxiles y la configuración separada del código","descomponible":"no","tipo":"entrada","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"e-mpl","acr":"mpl","padre":"root","nombre":"Implementación","que":"Tener el sincronizador armado y conectado","como":"Programar el Arduino → armar el sistema de adaptación de impedancia → conectar el coaxil del láser → conectar el coaxil del espectrómetro","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n20","acr":"mpl.rdn","padre":"e-mpl","nombre":"Arduino Mega","que":"Generar los dos pulsos con el retardo pedido","como":"Programar el Arduino y controlarlo desde la computadora","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n21","acr":"mpl.rdn.sft","padre":"n20","nombre":"Software .py .ino","que":"Programar el Arduino y controlarlo desde la computadora","como":"Programa del Arduino (.ino) que emite dos pulsos TTL con el retardo recibido, y programa en Python (.py) que envía el retardo y registra cada disparo","descomponible":"no","tipo":"entrada","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n22","acr":"mpl.sst","padre":"e-mpl","nombre":"Sistema de adaptación de impedancia","que":"Que cada instrumento reciba la señal con el nivel y la forma que pide","como":"Armar el hardware de acople","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n23","acr":"mpl.sst.hrd","padre":"n22","nombre":"Hardware","que":"Armar el hardware de acople","como":"Optoacopladores → resistencias de acople → componentes de protección → fuente","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n24","acr":"mpl.sst.hrd.ptc","padre":"n23","nombre":"Optoacopladores","que":"Aislar eléctricamente la computadora de los instrumentos","como":"Un optoacoplador por canal, con su tiempo de propagación medido","descomponible":"no","tipo":"entrada","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n25","acr":"mpl.sst.hrd.rss","padre":"n23","nombre":"Resistencias de acople","que":"Adaptar la impedancia de cada línea","como":"Resistencias según la impedancia de entrada de cada instrumento","descomponible":"no","tipo":"entrada","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n26","acr":"mpl.sst.hrd.cmp","padre":"n23","nombre":"Componentes de protección","que":"Proteger las entradas de sobretensiones","como":"Protecciones en cada canal","descomponible":"no","tipo":"entrada","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n27","acr":"mpl.sst.hrd.fnt","padre":"n23","nombre":"Fuente (USB-Transformador)","que":"Alimentar el circuito","como":"Alimentación por USB o por transformador","descomponible":"no","tipo":"entrada","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n28","acr":"mpl.cxl","padre":"e-mpl","nombre":"Coaxil Láser","que":"Llevar el pulso de disparo al láser","como":"Cable coaxil a la entrada de disparo externo del láser EKSPLA","descomponible":"no","tipo":"proceso","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n29","acr":"mpl.csp","padre":"e-mpl","nombre":"Coaxil Espectrómetro","que":"Llevar el pulso de lectura al espectrómetro","como":"Cable coaxil a la entrada de disparo externo del espectrómetro LIBS2500+","descomponible":"no","tipo":"proceso","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"e-vld","acr":"vld","padre":"root","nombre":"Validación","que":"Demostrar que el retardo real es el programado y que sirve para LIBS","como":"Medir el retardo real → comparar espectros a distintos retardos","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n30","acr":"vld.mdr","padre":"e-vld","nombre":"Medir el retardo real entre los dos pulsos","que":"Saber cuánto se separan de verdad los dos disparos","como":"Osciloscopio calibrado en las dos salidas; barrido de retardos programados; diferencia medida contra programada","descomponible":"no","tipo":"validacion","critico":true,"pi":"publico","idef0":{"entradas":"Retardos programados","salidas":"Retardos medidos y su diferencia","controles":"Osciloscopio calibrado","mecanismos":"SincLE conectado a las dos cargas"},"vmodel":{"criterio":"La diferencia medida queda dentro de la resolución buscada [a verificar]","kpi":"Diferencia máxima en el barrido (µs)","test":"Barrido de retardos con osciloscopio"},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n31","acr":"vld.cmp","padre":"e-vld","nombre":"Comparar espectros con la base del NIST","que":"Mostrar que el sincronizador sirve para LIBS","como":"Espectros adquiridos a distintos retardos comparados con la base del NIST o con modelos espectrales","descomponible":"no","tipo":"validacion","critico":false,"pi":"publico","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"e-pmv","acr":"pmv","padre":"root","nombre":"PMV SincLE","que":"Entregar SincLE listo para usar y replicar","como":"Entregar el sincronizador con su documentación","descomponible":"si","tipo":"proceso","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n40","acr":"pmv.snc","padre":"e-pmv","nombre":"Sincronizador documentado","que":"Entregar el sincronizador funcionando y documentado","como":"Manual → informe","descomponible":"si","tipo":"entrada","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n41","acr":"pmv.snc.mnl","padre":"n40","nombre":"Manual","que":"Que otro laboratorio pueda usar y armar SincLE","como":"Manual de uso y de armado, con el esquema eléctrico","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"},{"id":"n42","acr":"pmv.snc.nfr","padre":"n40","nombre":"Informe","que":"Dejar registrado cómo se validó","como":"Informe de validación con las mediciones del retardo y los espectros","descomponible":"no","tipo":"documento","critico":false,"pi":"sin_definir","idef0":{},"vmodel":{},"doc":"","origen":"Flujo SincLE-FP-01"}]},"flujo":{"doc":{"codigo":"SincLE-FP-01","version":"0.1","fecha":"2026-10-05","estado":"Ejemplo resuelto","semaforo":"verde","titulo":"SincLE · Sincroniza la Luz para ver más allá de lo Evidente","objetivo":"Entender los procesos para planificar, implementar y validar el sistema de sincronización del láser EKSPLA y del espectrómetro LIBS2500+.","acronimo":"SincLE","fase":"Prototipo funcional (PMV)","trl":"","elaboro":"Cinthya Toro","reviso":"—","aprobo":"—","autores":"Cinthya Toro","origen":"Diagrama de flujo de SincLE en Excel (hoja Ago26, 31/08/2026), sin la paleta de íconos. La etapa Validación estaba vacía: sus elementos son propuestas (05/10/2026)."},"etapas":[{"id":"pln","nombre":"Planificación"},{"id":"drq","nombre":"Determinación de requisitos"},{"id":"mpl","nombre":"Implementación"},{"id":"vld","nombre":"Validación"},{"id":"pmv","nombre":"PMV SincLE"}],"nodos":[{"id":"n01","etapa":"pln","padre":"","tipo":"datos","texto":"DiDe","origen":"Excel"},{"id":"n02","etapa":"pln","padre":"n01","tipo":"documento","texto":"Concepto","origen":"Excel"},{"id":"n03","etapa":"pln","padre":"n01","tipo":"documento","texto":"A3","origen":"Excel"},{"id":"n04","etapa":"pln","padre":"n01","tipo":"documento","texto":"Flujo del proyecto","origen":"Excel","nota":"En el Excel original se llamaba «Diagrama de procesos»."},{"id":"n05","etapa":"pln","padre":"n01","tipo":"documento","texto":"Ishikawa 6M","origen":"Excel"},{"id":"n06","etapa":"pln","padre":"n01","tipo":"documento","texto":"WBS","origen":"Excel"},{"id":"n07","etapa":"pln","padre":"n01","tipo":"documento","texto":"Diccionario","origen":"Excel"},{"id":"n08","etapa":"pln","padre":"n01","tipo":"documento","texto":"BIM","origen":"Excel"},{"id":"n10","etapa":"drq","padre":"","tipo":"datos","texto":"Seguridad","origen":"Excel"},{"id":"n11","etapa":"drq","padre":"","tipo":"datos","texto":"1 microsegundo","origen":"Excel"},{"id":"n12","etapa":"drq","padre":"","tipo":"datos","texto":"Adaptativo","origen":"Excel"},{"id":"n13","etapa":"drq","padre":"","tipo":"datos","texto":"Modular","origen":"Excel"},{"id":"n20","etapa":"mpl","padre":"","tipo":"proceso","texto":"Arduino Mega","origen":"Excel"},{"id":"n21","etapa":"mpl","padre":"n20","tipo":"datos","texto":"Software .py .ino","origen":"Excel"},{"id":"n22","etapa":"mpl","padre":"","tipo":"proceso","texto":"Sistema de adaptación de impedancia","origen":"Excel"},{"id":"n23","etapa":"mpl","padre":"n22","tipo":"proceso","texto":"Hardware","origen":"Excel"},{"id":"n24","etapa":"mpl","padre":"n23","tipo":"datos","texto":"Optoacopladores","origen":"Excel"},{"id":"n25","etapa":"mpl","padre":"n23","tipo":"datos","texto":"Resistencias de acople","origen":"Excel"},{"id":"n26","etapa":"mpl","padre":"n23","tipo":"datos","texto":"Componentes de protección","origen":"Excel"},{"id":"n27","etapa":"mpl","padre":"n23","tipo":"datos","texto":"Fuente (USB-Transformador)","origen":"Excel"},{"id":"n28","etapa":"mpl","padre":"","tipo":"proceso","texto":"Coaxil Láser","origen":"Excel"},{"id":"n29","etapa":"mpl","padre":"","tipo":"proceso","texto":"Coaxil Espectrómetro","origen":"Excel"},{"id":"n30","etapa":"vld","padre":"","tipo":"proceso","texto":"Medir el retardo real entre los dos pulsos","origen":"Propuesta","control":{"tipo":"verificacion","que":"Diferencia de tiempo entre los pulsos TTL de los dos pines","referencia":"","criterio":"Igual al retardo programado, entre 1 µs y 10 µs, en cada disparo (tolerancia a fijar)","reaccion":"","resultado":"","pista":"Osciloscopio con calibración vigente"}},{"id":"n31","etapa":"vld","padre":"","tipo":"proceso","texto":"Comparar espectros a distintos retardos con la base del NIST o con modelos","origen":"A3 8","control":{"tipo":"validacion","que":"Espectros LIBS adquiridos a distintos retardos","referencia":"Base de datos de líneas espectrales del NIST o modelos espectrales","criterio":"","reaccion":"","resultado":""}},{"id":"n32","etapa":"vld","padre":"","tipo":"decision","texto":"¿El retardo medido coincide con el programado?","origen":"Propuesta","si":"PMV","no":"Volver a Implementación y ajustar"},{"id":"n40","etapa":"pmv","padre":"","tipo":"datos","texto":"PMV SincLE","origen":"Excel"},{"id":"n41","etapa":"pmv","padre":"n40","tipo":"documento","texto":"Manual","origen":"Excel"},{"id":"n42","etapa":"pmv","padre":"n40","tipo":"documento","texto":"Informe","origen":"Excel"}],"rutas":[]},"ishikawa":{"doc":{"codigo":"SincLE-ISH-01","version":"0.1","fecha":"2026-10-03","estado":"Ejemplo","semaforo":"verde","titulo":"SincLE · retardo láser–espectrómetro","pregunta":"¿Qué determina que el espectrómetro adquiera en el retardo programado?","efecto":"El espectrómetro adquiere en el retardo programado respecto del disparo del láser","objetivo":"Objetivo: retardo ajustable entre 10 µs y 1 µs, igual en cada disparo. Ejemplo ilustrativo: SincLE todavía no está construido.","elaboro":"Cinthya Toro","reviso":"—","aprobo":"—","autores":"Cinthya Toro"},"causas":[{"id":"c1","m":"Método","texto":"El retardo se fija por software","autor":"CT","estado":"no_dominada","nota":"El control por software no alcanza la resolución de microsegundos que pide LIBS. Es justo lo que SincLE resuelve por hardware.","medicion":"Comparar el retardo programado con el medido"},{"id":"c2","m":"Máquina","texto":"Los dos instrumentos sólo funcionan como Master","autor":"CT","estado":"no_dominada","nota":"Láser EKSPLA y espectrómetro LIBS2500+, ambos del 2000.","medicion":""},{"id":"c3","m":"Máquina","texto":"Arduino Mega como generador de pulsos TTL","autor":"CT","estado":"variable","nota":"Dos pines con diferencia de microsegundos ajustable. Falta validar su repetibilidad.","medicion":"Osciloscopio sobre los dos pines"},{"id":"c4","m":"Materiales","texto":"Retardo propio de optoacopladores y cables","autor":"CT","estado":"variable","nota":"Cada componente de acople suma su propio retardo.","medicion":"Medir el retardo de cada componente"},{"id":"c5","m":"Medición","texto":"¿Con qué se verifica el retardo real?","autor":"?","estado":"sin_evaluar","nota":"Pregunta abierta.","medicion":""},{"id":"c6","m":"Mano de obra","texto":"El retardo se cambia a mano en cada experimento","autor":"CT","estado":"variable","nota":"Depende de quien opera.","medicion":""},{"id":"c7","m":"Medio ambiente","texto":"Ruido eléctrico del láser en las señales","autor":"?","estado":"sin_evaluar","nota":"Pregunta abierta.","medicion":""}]},"a3":{"herramienta":"DiDe A3","version_formato":1,"doc":{"codigo":"SincLE-A3","version":"0.1","titulo":"A3 — SincLE · Sincroniza la Luz para ver más allá de lo Evidente","semaforo":"verde","elaboro":"Cinthya Toro"},"cajas":{"1":{"nombre":"Beneficiarios","md":"**Principal:** el sistema microLIBS de CITEDEF, que necesita sincronizar su láser y su espectrómetro.\n\n**Secundarios:** CNEA y laboratorios de Argentina y de la región que arman sistemas complejos con instrumentos; doctores, doctorandos, ingenieros y técnicos."},"2":{"nombre":"Problemas","md":"**Principal:** el láser EKSPLA y el espectrómetro LIBS2500+ son del 2000 y los dos sólo funcionan como Master. Por software no se alcanza la resolución de microsegundos que requiere LIBS.\n\n**Secundario:** los sincronizadores comerciales son cerrados y caros (US$600 a US$5000).\n\n**Cómo se resuelve hoy:** con generadores de pulsos y de señales de sincronización comerciales."},"3":{"nombre":"Propuesta de valor","md":"Sincroniza la Luz para ver más allá de lo Evidente: sincronización por hardware, de 10 µs a 1 µs, ajustable en cada experimento."},"4":{"nombre":"Soluciones","md":"- Arduino Mega que emite pulsos TTL por dos pines con una diferencia de microsegundos ajustable.\n- Acople al láser y al espectrómetro: adaptación de impedancia, optoacopladores, resistencias de acople y cables coaxiles.\n- Componentes de protección y fuente (USB o transformador).\n- Software: programa del Arduino (.ino) y control desde Python (.py)."},"5":{"nombre":"Canales","md":"- **Integración:** primero al sistema microLIBS; a futuro, otros instrumentos del laboratorio.\n- **Formación:** doctorandos que lo ajustan y generan nuevos experimentos.\n- **Réplica:** laboratorios de Argentina y Latinoamérica sin presupuesto para sistemas comerciales."},"6":{"nombre":"Valor capturado","md":"- **Académico:** tesis doctorales y nuevos experimentos con resolución temporal controlada.\n- **Institucional:** capacidad instalada propia en CITEDEF.\n- **Económico:** sincronización por menos de $50.000 frente a US$600–5000 de un equipo comercial.\n- **A futuro:** posible fabricación en serie."},"7":{"nombre":"Estructura de costes","md":"- **Ya disponible:** Arduino Mega, los instrumentos y el programa.\n- **A comprar:** componentes electrónicos de acople y protección.\n- **Personal:** conocimientos de programación e instrumentación.\n- **Prototipo funcional:** $50.000.\n- **Prototipo de vuelo** (ESPCAM, suma visión de la muestra): $100.000."},"8":{"nombre":"Métricas clave","md":"- **Técnico:** resolución de sincronización entre 10 µs y 1 µs.\n- **Funcional:** el láser dispara, se hace un barrido de tiempos y el espectrómetro lee a esas diferencias en forma real.\n- **Validación:** espectros a distintos tiempos comparados con la base del NIST o con modelos espectrales.\n- **Plazo:** una versión con otro láser llevó 6 meses."},"9":{"nombre":"Ventaja diferencial","md":"- **Abierto y especificable:** se adapta a lo que pide una tesis doctoral; los comerciales no.\n- **Costo:** un orden de magnitud menor que un equipo comercial.\n\n**Pregunta para trabajar:** ¿SincLE tiene partes protegibles? Arduino y pulsos TTL son técnicas conocidas, pero el Concepto original decía que \"podría llegar a necesitar protección de PI\". ¿Qué habría que documentar para decidirlo?"}}},"concepto":{"doc":{"codigo":"SincLE-CON-01","version":"0.1","fecha":"2026-10-06","estado":"Ejemplo resuelto","semaforo":"verde","titulo":"SincLE","elaboro":"Cinthya Toro","reviso":"—","aprobo":"—","origen":"Respuestas del Concepto de SincLE (0_Concepto-SincLE), las mismas que se usan como ejemplo en cada pregunta."},"personas":[{"id":"p1","nombre":"Cinthya Toro","r":{"1":"Cinthya Toro","2":"Todo: diseño, electrónica y programación.","3":"(no se muestra en el ejemplo)","4":"La Salle 4397, CP1603 (Villa Martelli, Pcia. Bs. As.) — CITEDEF.","5":"Villa Martelli, Pcia. Bs. As.","6":"Argentina","7":"Sistema de Sincronización Láser-Espectrómetro. Acrónimo: SincLE.","8":"SincLE afecta a CITEDEF, CNEA, al sistema microLIBS y a otros laboratorios e institutos que pudieran utilizar/necesitar un sistema de sincronización de alta resolución temporal.","9":"El impacto de SincLE es directo en la sincronización del láser EKSPLA y del espectrómetro LIBS2500+, ya que ambos equipos necesitan un sistema que los sincronice con pocos microsegundos de retardo.","10":"Sí, el económico, porque hacer SincLE costaría menos de 50 mil y comprar un generador de pulsos sale por lo menos 500 mil.","11":"Sí, una versión de sincronización con otro láser se demoró 6 meses en implementar.","12":"Sí, es simple porque se utilizaría la plataforma Arduino. Es económico porque se tendrían que comprar componentes como resistencias, optoacopladores, etc., que son económicos.","13":"Durará mucho tiempo y se podrían pasar a doctorandos para que implementen ajustes y generen nuevos experimentos.","14":"Compite con fabricantes de sistemas electrónicos de sincronización, como generadores de pulsos y generadores de señales de sincronización.","15":"Se diferencia en que los sistemas comerciales no son open source y no se pueden especificar para una tesis doctoral. Pero el diferencial es más interesante: genera conocimiento y podría llegar a necesitar protección de PI.","16":"La idea es que este sistema, en principio, sincronice con una resolución de 10 us a 1 us un láser EKSPLA y un espectrómetro LIBS2500+. Se puede programar un Arduino para que saque pulsos TTL por dos de sus pines con diferencia de microsegundos, de tal forma que se pueda modificar ese valor para cada experimento.","17":"Los instrumentos que sincronizará son del 2000 y ambos sólo funcionan como Master cuando se los requiere sincronizar. Como solución se quiere implementar un sistema que los sincronice con hardware, porque con el control por software no se alcanza la resolución de microsegundos que se requiere para hacer LIBS.","18":"CITEDEF, CNEA y el sistema científico argentino (doctores, doctorandos, ingenieros, técnicos, biólogos, etc.).","19":"Diseñar el sistema con DiDe.\nImplementar la primera versión: SincLEv1.\nValidar SincLEv1.\nAgregar SincLEv1 al sistema microLIBS.\nMejorarlo para que sea un sistema de sincronización general.","20":"Que el láser EKSPLA dispare, que se pueda hacer un barrido de tiempos en microsegundos, y que el espectrómetro LIBS2500+ lea a esas diferencias temporales en forma real. Se mediría comparando espectros medidos a diferentes tiempos con la base del NIST o con modelos espectrales.","21":"SincLE, Sincroniza la Luz para ver más allá de lo Evidente.","22":"Tenemos un Arduino Mega, los instrumentos y el programa. Se requiere personal con conocimientos en programación e instrumentación, y los componentes electrónicos para acoplar el sistema Arduino al láser y al espectrómetro. Con $50.000 alcanzaría.","23":"Se podría pasar a un ESPCAM para agregar visión a la sincronización. Se requieren $100.000.","24":"Sí.","25":"Sí, laboratorios que utilizan instrumentación para armar sistemas complejos, de Argentina y de la región.","26":"Sí, a nivel Latinoamérica, porque los investigadores no cuentan con presupuestos para adquirir sistemas comerciales que salen desde US$600 hasta US$5000.","27":"Sí.","28":"Subsidios de institutos de investigación, concursos de innovación.","29":"De concursos y/o del Estado.","30":"De concursos y/o del Estado.","31":"De concursos y/o del Estado, de empresas privadas.","32":"Ministerio de Defensa, CONICET, universidades, escuelas técnicas, laboratorios biológicos."}}]},"amfe":[{"doc":{"codigo":"SincLE-AMFE-01","version":"0.1","fecha":"2026-10-05","estado":"Ejemplo ilustrativo","semaforo":"verde","titulo":"SincLE · armado e integración del sincronizador","alcance":"Ruta de armado de SincLE, de la especificación de señales a la validación con espectros","elaboro":"Cinthya Toro","reviso":"—","aprobo":"—","autores":"Cinthya Toro","origen":"Ejemplo ilustrativo: las causas son las del ejemplo del Ishikawa DiDe (SincLE). SincLE todavía no está construido; los puntajes muestran el método, no datos medidos.","umbralNPR":150,"umbralS":9,"plan":"prototipo"},"pasos":[{"id":"a1","texto":"Especificar las señales del láser y del espectrómetro","acr":"mpl.rmd.spc"},{"id":"a2","texto":"Armar el acople (optoacopladores, resistencias, protecciones)","acr":"mpl.rmd.rmr"},{"id":"a3","texto":"Programar el Arduino (.ino) y el control (.py)","acr":"mpl.rmd.prg"},{"id":"a4","texto":"Conectar los coaxiles e integrar","acr":"mpl.rmd.cnc"},{"id":"a5","texto":"Medir el retardo real entre los pulsos","acr":"vld.mdr"},{"id":"a6","texto":"Validar con espectros a distintos retardos","acr":"vld.cmp"}],"causas":[{"id":"c1","m":"Método","texto":"El retardo se fija por software","estado":"no_dominada"},{"id":"c2","m":"Máquina","texto":"Los dos instrumentos sólo funcionan como Master","estado":"no_dominada"},{"id":"c3","m":"Máquina","texto":"Arduino Mega como generador de pulsos TTL","estado":"variable"},{"id":"c4","m":"Materiales","texto":"Retardo propio de optoacopladores y cables","estado":"variable"},{"id":"c5","m":"Medición","texto":"¿Con qué se verifica el retardo real?","estado":"sin_evaluar"},{"id":"c6","m":"Mano de obra","texto":"El retardo se cambia a mano en cada experimento","estado":"variable"},{"id":"c7","m":"Medio ambiente","texto":"Ruido eléctrico del láser en las señales","estado":"sin_evaluar"}],"filas":[{"id":"f1","paso":"a1","modo":"Nivel o flanco de disparo mal especificado","efecto":"Un instrumento no dispara o dispara tarde","s":8,"causa":"Los dos instrumentos sólo funcionan como Master","causaRef":["c2"],"o":4,"prevencion":"Hojas de datos de ambos equipos","deteccion":"Prueba de disparo con osciloscopio","d":3,"accion":"","responsable":"","plazo":"","estadoAccion":"","origen":"CT"},{"id":"f2","paso":"a2","modo":"Retardo propio del acople distinto del supuesto","efecto":"El retardo real no es el programado","s":7,"causa":"Retardo de optoacopladores y cables","causaRef":["c4"],"o":6,"prevencion":"","deteccion":"","d":7,"accion":"Medir el retardo de cada componente y descontarlo en el software","responsable":"CT","plazo":"","estadoAccion":"abierta","origen":"CT"},{"id":"f3","paso":"a2","modo":"Ruido del láser acoplado a la señal","efecto":"Disparos falsos del espectrómetro","s":8,"causa":"Ruido eléctrico del láser","causaRef":["c7"],"o":5,"prevencion":"Optoacopladores","deteccion":"","d":6,"accion":"Blindaje y ensayo con el láser disparando","responsable":"","plazo":"","estadoAccion":"abierta","origen":"CT"},{"id":"f4","paso":"a3","modo":"Temporización del Arduino variable entre disparos","efecto":"El retardo cambia de un disparo a otro","s":8,"causa":"Arduino Mega como generador de pulsos","causaRef":["c3","c1"],"o":5,"prevencion":"","deteccion":"Osciloscopio","d":4,"accion":"Medir la repetibilidad del retardo en 1000 disparos","responsable":"CT","plazo":"","estadoAccion":"en_curso","origen":"CT"},{"id":"f5","paso":"a4","modo":"Retardo cambiado a mano con error","efecto":"Un experimento queda con un retardo equivocado","s":6,"causa":"El retardo se cambia a mano","causaRef":["c6"],"o":5,"prevencion":"","deteccion":"Cuaderno de laboratorio","d":6,"accion":"Guardar el retardo en el archivo de cada espectro, automáticamente","responsable":"","plazo":"","estadoAccion":"abierta","origen":"CT"},{"id":"f6","paso":"a5","modo":"Osciloscopio sin calibración vigente","efecto":"El retardo medido no tiene respaldo","s":9,"causa":"No está definido con qué se verifica el retardo","causaRef":["c5"],"o":4,"prevencion":"","deteccion":"","d":7,"accion":"Usar un osciloscopio con certificado vigente","responsable":"","plazo":"","estadoAccion":"abierta","origen":"CT"},{"id":"f7","paso":"a6","modo":"Comparación con el NIST sin criterio de aceptación","efecto":"No se puede afirmar que el retardo es el correcto","s":7,"causa":"Criterio de aceptación no definido","causaRef":[],"o":6,"prevencion":"","deteccion":"","d":6,"accion":"Definir las líneas y las tolerancias de comparación","responsable":"","plazo":"","estadoAccion":"abierta","origen":"CT"}],"plan":[{"id":"k1","paso":"a5","caracteristica":"Retardo entre pulsos","tipo":"verificacion","metodo":"Osciloscopio con calibración vigente","criterio":"Igual al programado, dentro de la tolerancia a fijar","frecuencia":"Al empezar cada sesión","registro":"Archivo del experimento","reaccion":"No adquirir hasta corregir","responsable":"CT"},{"id":"k2","paso":"a6","caracteristica":"Posición de las líneas espectrales","tipo":"validacion","metodo":"Base de datos de líneas del NIST","criterio":"","frecuencia":"Cada cambio de retardo","registro":"Archivo del experimento","reaccion":"","responsable":""}]}]},"documentos":[{"id":"dide-wbs","codigo":"SincLE-WBS-01","titulo":"SincLE · Sincroniza la Luz para ver más allá de lo Evidente","tipo":"DiDe · WBS y Diccionario","version":"0.1","estado":"en_curso","semaforo":"verde","elaboro":"Claude, a pedido de Cinthya Toro (árbol del flujo de Cinthya Toro)","reviso":"","aprobo":"","url":"../Ejemplos/SincLE/SincLE_WBS_v0.html","globitos":["root"],"origen":"importado","fuente":"wbs"},{"id":"dide-flujo","codigo":"SincLE-FP-01","titulo":"SincLE · Sincroniza la Luz para ver más allá de lo Evidente","tipo":"DiDe · Flujo del proyecto","version":"0.1","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"DiDe_FlujoProyecto.html","globitos":["root"],"origen":"importado","fuente":"flujo"},{"id":"dide-ishikawa","codigo":"SincLE-ISH-01","titulo":"SincLE · retardo láser–espectrómetro","tipo":"DiDe · Ishikawa 6M","version":"0.1","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"DiDe_Ishikawa.html","globitos":["root"],"origen":"importado","fuente":"ishikawa"},{"id":"dide-a3","codigo":"SincLE-A3","titulo":"A3 — SincLE · Sincroniza la Luz para ver más allá de lo Evidente","tipo":"DiDe · A3","version":"0.1","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"../Ejemplos/SincLE/SincLE_A3_v0.html","globitos":["root"],"origen":"importado","fuente":"a3"},{"id":"dide-concepto","codigo":"SincLE-CON-01","titulo":"SincLE","tipo":"DiDe · Concepto","version":"0.1","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"DiDe_Concepto.html","globitos":["root"],"origen":"importado","fuente":"concepto"},{"id":"dide-amfe-SincLE-AMFE-01","codigo":"SincLE-AMFE-01","titulo":"SincLE · armado e integración del sincronizador","tipo":"DiDe · AMFE de proceso y plan de control","version":"0.1","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"DiDe_AMFE.html","globitos":["root"],"origen":"importado","fuente":"amfe"},{"origen":"externo","id":"s-pdf","codigo":"SincLE-A3-PDF","titulo":"A3 de SincLE impreso en A4","tipo":"Informe","version":"","estado":"compartido","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"../Ejemplos/SincLE/SincLE_A3_v0.pdf","globitos":["root"]},{"origen":"externo","id":"s-cod","codigo":"SincLE-COD-01","titulo":"Programa del Arduino (.ino) y control en Python (.py)","tipo":"Código","version":"","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"","globitos":["n21","n20"]},{"origen":"externo","id":"s-esq","codigo":"SincLE-ESQ-01","titulo":"Esquema eléctrico del acople","tipo":"Plano o diseño","version":"","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"","globitos":["n23","n22"]},{"origen":"externo","id":"s-man","codigo":"SincLE-MAN-01","titulo":"Manual de uso y de armado","tipo":"Guía de uso","version":"","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"","globitos":["n41","n20","n22"]},{"origen":"externo","id":"s-inf","codigo":"SincLE-INF-01","titulo":"Informe de validación (retardo medido y espectros)","tipo":"Informe","version":"","estado":"en_curso","semaforo":"verde","elaboro":"Cinthya Toro","reviso":"","aprobo":"","url":"","globitos":["n42","n30","n31"]}],"materiales":[{"id":"mt-ard","nombre":"Arduino Mega","tipo":"componente","cantidad":"1","unidad":"u","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n20"],"semaforo":"verde"},{"id":"mt-opt","nombre":"Optoacopladores","tipo":"componente","cantidad":"2","unidad":"u","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n24"],"semaforo":"verde"},{"id":"mt-res","nombre":"Resistencias de acople","tipo":"componente","cantidad":"","unidad":"","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n25"],"semaforo":"verde"},{"id":"mt-prt","nombre":"Componentes de protección","tipo":"componente","cantidad":"","unidad":"","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n26"],"semaforo":"verde"},{"id":"mt-fnt","nombre":"Fuente (USB o transformador)","tipo":"componente","cantidad":"1","unidad":"u","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n27"],"semaforo":"verde"},{"id":"mt-cx","nombre":"Cables coaxiles","tipo":"componente","cantidad":"2","unidad":"u","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n28","n29"],"semaforo":"verde"},{"id":"mt-osc","nombre":"Osciloscopio calibrado (ya disponible en el laboratorio)","tipo":"equipo","cantidad":"1","unidad":"u","costo":"","moneda":"ARS","proveedor":"","url":"","globitos":["n30"],"semaforo":"verde"}],"globitos":{"root":{"madurez":"laboratorio","trl":"","semaforo":"verde","textos":{"para":"Ejemplo público de CaPI: un sincronizador real, documentado con DiDe de punta a punta."}},"e-pln":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"e-drq":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"e-mpl":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"e-vld":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"e-pmv":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n01":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n02":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n03":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n04":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n05":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n06":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n07":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n08":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n40":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n41":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n42":{"madurez":"","trl":"","semaforo":"verde","textos":{}},"n20":{"madurez":"laboratorio","trl":"","semaforo":"","textos":{"cuanto":"Una versión con otro láser ya funcionó (llevó 6 meses, según el A3)."}},"n11":{"madurez":"hipotesis","trl":"","semaforo":"","textos":{}}}}
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const PREG=[["para","¿Para qué sirve?","Colaboradores nuevos, evaluadores, gestión"],["uso","¿Cómo se usa?","Quien opera"],
+    ["reproduce","¿Cómo se reproduce?","Quien construye, fabrica o transfiere"],["porque","¿Por qué es así?","Investigadores de otras disciplinas"],
+    ["cuanto","¿Cuánto se sabe?","Todos, antes de confiar en un dato"]];
+  const SEMA={rojo:{h:"#b3261e",d:"Sólo autores y capacitadora."},amarillo:{h:"#b58500",d:"Todo el grupo."},verde:{h:"#2e7d32",d:"Público."}};
+  const LV={verde:0,amarillo:1,rojo:2};
+  const LECTOR={rojo:"Autores: se ve todo.",amarillo:"Grupo: se ocultan los secretos, las patentes y los documentos rojos.",verde:"Público: sólo lo público; lo demás se nombra sin revelarse."};
+  const PI={publico:"Público",secreto:"Secreto",patente:"Candidato a patente",sin_definir:"Sin definir"};
+  const MAD={"":"—",hipotesis:"Hipótesis",laboratorio:"Probado en el laboratorio",validado:"Validado",transferido:"Transferido"};
+  const EST={en_curso:"En curso",compartido:"Compartido",publicado:"Publicado",archivado:"Archivado"};
+  const TIPOS_DOC=["Procedimiento (SOP)","Guía de uso","Especificación","Plano o diseño","Código","Datos","Informe","Artículo","PID","Hoja de ruta","Ficha de módulo","Otro"];
+  const TIPOS_MAT={componente:"Componente",insumo:"Insumo",equipo:"Equipo",software:"Software"};
+  const CTL={calibracion:"Calibración",verificacion:"Verificación",validacion:"Validación",calificacion:"Calificación"};
+  const FUENTE={wbs:"WBS",flujo:"Flujo del proyecto",ishikawa:"Ishikawa",amfe:"AMFE",a3:"A3",concepto:"Concepto"};
+
+  const ORIG=JSON.parse(document.getElementById("datos").textContent);
+  let D,KEY,view="explorar",sel=null,lector="rojo",preg="reproduce";
+  const $=id=>document.getElementById(id);
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  function load(){KEY="dide-bimi-"+(ORIG.doc.codigo||"x");D=clone(ORIG);try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s);}catch(e){}normalize();}
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}};
+  function normalize(){D.doc=D.doc||{};D.fuentes=D.fuentes||{};D.fuentes.amfe=D.fuentes.amfe||[];D.documentos=D.documentos||[];D.materiales=D.materiales||[];D.globitos=D.globitos||{};
+    D.documentos.forEach(d=>{d.globitos=d.globitos||[];});D.materiales.forEach(m=>{m.globitos=m.globitos||[];});}
+  let seq=Date.now();const uid=p=>p+(seq++).toString(36);
+  const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const trunc=(s,n)=>(s=String(s||""),s.length>n?s.slice(0,n-1)+"…":s);
+  const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const mdInl=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]*)`/g,"$1");
+  function h(tag,a,txt){const e=document.createElement(tag);if(a)for(const k in a){if(k==="class")e.className=a[k];else e.setAttribute(k,a[k]);}if(txt!=null)e.textContent=txt;return e;}
+  const hoy=()=>new Date().toISOString().slice(0,10);
+
+  // ---------------------------------------------------------------- árbol y datos derivados
+  const W=()=>D.fuentes.wbs||{nodos:[]};
+  const nodos=()=>W().nodos||[];
+  const byId=id=>nodos().find(n=>n.id===id);
+  const kids=id=>nodos().filter(n=>n.padre===id);
+  function dfs(){const out=[],vis=(n,d)=>{out.push({n,d});kids(n.id).forEach(k=>vis(k,d+1));};nodos().filter(n=>!n.padre||!byId(n.padre)).forEach(n=>vis(n,0));return out;}
+  function flujoItem(id){const F=D.fuentes.flujo;if(!F)return null;const n=(F.nodos||[]).find(x=>x.id===id);if(n)return n;
+    for(const r of F.rutas||[]){const p=(r.pasos||[]).find(x=>x.id===id);if(p)return Object.assign({ruta:r.id},p);}return null;}
+  function acr(n){if(!n)return"";if(n.acr)return n.acr;const f=flujoItem(n.id);if(f&&f.acr)return f.acr;if(/^e-/.test(n.id))return n.id.slice(2);
+    if(/^ruta-/.test(n.id)&&D.fuentes.flujo){const r=(D.fuentes.flujo.rutas||[]).find(x=>"ruta-"+x.id===n.id);if(r&&r.acr)return r.acr;}return n.id;}
+  const G=id=>(D.globitos[id]=D.globitos[id]||{madurez:"",trl:"",semaforo:"",textos:{}});
+  const g0=id=>D.globitos[id]||{madurez:"",trl:"",semaforo:"",textos:{}};
+  function semPI(n){const p=n&&n.pi;return p==="secreto"||p==="patente"?"rojo":p==="publico"?"verde":"amarillo";}
+  const semGlob=n=>g0(n.id).semaforo||semPI(n);
+  const semFuente=k=>{const f=k==="amfe"?null:D.fuentes[k];return (f&&f.doc&&f.doc.semaforo)||"rojo";};
+  const ve=s=>LV[s||"rojo"]<=LV[lector];
+  const verFuente=k=>ve(semFuente(k));
+  const verGlob=n=>ve(semGlob(n));
+  const docsDe=id=>D.documentos.filter(d=>d.globitos.includes(id));
+  const matsDe=id=>D.materiales.filter(m=>m.globitos.includes(id));
+  function causasDe(n){const I=D.fuentes.ishikawa;if(!I)return[];const a=acr(n);
+    return(I.causas||[]).filter(c=>c.paso===n.id||(a&&c.paso===a)||(a&&a.includes(".")&&String(c.nota||"").includes(a)));}
+  // Una fila del AMFE es de un globito si su paso tiene el mismo id, o el mismo acrónimo, o el mismo texto que el nombre.
+  function pasoEsDe(A,pid,n){if(pid===n.id)return true;const p=(A.pasos||[]).find(x=>x.id===pid);if(!p)return false;
+    return (p.acr&&p.acr===acr(n))||norm(String(p.texto).split(" — ")[0])===norm(n.nombre);}
+  function amfeDe(n){const out=[];D.fuentes.amfe.forEach(A=>{(A.filas||[]).filter(f=>pasoEsDe(A,f.paso,n)).forEach(f=>out.push({A,f}));});return out;}
+  function planDe(n){const out=[];D.fuentes.amfe.forEach(A=>{(A.plan||[]).filter(k=>pasoEsDe(A,k.paso,n)).forEach(k=>out.push({A,k}));});return out;}
+  const verAmfe=A=>ve((A.doc&&A.doc.semaforo)||"rojo");
+  const terminal=n=>!kids(n.id).length;
+  function docTxt(d){if(!ve(d.semaforo))return esc(d.codigo||"documento")+" <span class='oculto'>(confidencial)</span>";
+    const t=esc(d.codigo?d.codigo+" · ":"")+esc(d.titulo||"");return d.url?"<a href='"+esc(d.url)+"' target='_blank' rel='noopener'>"+t+"</a>":t+" <span class='falta'>(sin enlace)</span>";}
+  function a3Caja(k){const A=D.fuentes.a3;const c=A&&A.cajas&&A.cajas[k];return c?c.md||"":"";}
+  const mdBloque=m=>String(m||"").split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>"<p>"+mdInl(l.replace(/^[-*]\s+/,"• ").replace(/^>\s*\*Para pensar:\*\s*/,"Para pensar: "))+"</p>").join("");
+
+  // ---------------------------------------------------------------- las cinco capas de un globito
+  // Devuelve {html, faltas, oculta}. Lo que no se puede ver se nombra sin revelarse.
+  function capa(n,k){const out=[],faltas=[],src=[];const g=g0(n.id),propio=(g.textos||{})[k];
+    if(!verGlob(n))return{html:"<p class='oculto'>Contenido confidencial ("+(PI[n.pi]||"PI sin definir")+(n.doc?"; se documenta en «"+esc(n.doc)+"»":"")+").</p>",faltas:[],oculta:true};
+    if(propio)out.push("<p class='propio'>"+esc(propio)+"</p>");
+    const wbsOk=verFuente("wbs");
+    if(k==="para"){
+      if(wbsOk&&n.que)out.push("<p>"+esc(n.que)+"</p>");else if(!n.que)faltas.push("¿Qué logra esta parte?");
+      const p=byId(n.padre);if(p&&wbsOk)out.push("<p class='hint'>Es parte de <b>"+esc(acr(p))+" · "+esc(p.nombre)+"</b>"+(p.que?": "+esc(p.que):"")+".</p>");
+      if(!n.padre&&D.fuentes.a3){if(verFuente("a3")){[["3","Propuesta de valor"],["2","Problemas"],["1","Beneficiarios"]].forEach(([c,t])=>{const m=a3Caja(c);if(m)out.push("<p><b>"+t+" (A3):</b></p>"+mdBloque(m));});src.push("A3");}
+        else out.push("<p class='oculto'>El A3 es confidencial para este lector.</p>");}
+      if(wbsOk)src.push("WBS");}
+    if(k==="uso"){const ds=docsDe(n.id).filter(d=>/procedimiento|gu[ií]a|manual|sop/i.test(d.tipo||""));
+      if(ds.length)out.push("<ul>"+ds.map(d=>"<li>"+docTxt(d)+"</li>").join("")+"</ul>");
+      else if(n.tipo!=="documento"&&terminal(n)&&!propio)faltas.push("¿Esta parte la opera alguien? ¿Con qué instructivo?");}
+    if(k==="reproduce"){
+      if(wbsOk&&n.como){out.push("<p>"+esc(n.como)+"</p>");src.push("WBS");}else if(!n.como)faltas.push("¿Cómo se hace?");
+      const f=flujoItem(n.id);
+      if(f&&f.control&&verFuente("flujo")){const c=f.control;out.push("<p>✔ <b>"+(CTL[c.tipo]||"Control")+":</b> "+esc(c.que||"")+(c.referencia?" · referencia: "+esc(c.referencia):"")+(c.criterio?" · criterio: "+esc(c.criterio):"")+(c.reaccion?" · si no cumple: "+esc(c.reaccion):"")+"</p>");src.push("Flujo");}
+      const pl=planDe(n).filter(x=>verAmfe(x.A));if(pl.length){out.push("<ul>"+pl.map(({k:p})=>"<li>Plan: "+esc(p.caracteristica)+" — "+esc(p.metodo||"")+(p.frecuencia?" · "+esc(p.frecuencia):"")+"</li>").join("")+"</ul>");src.push("AMFE");}
+      const ms=matsDe(n.id);if(ms.length)out.push("<p><b>Materiales:</b> "+ms.map(m=>ve(m.semaforo)?esc(m.nombre)+(m.cantidad?" ("+esc(m.cantidad)+" "+esc(m.unidad||"")+")":""):"<span class='oculto'>material confidencial</span>").join(" · ")+"</p>");
+      const ds=docsDe(n.id).filter(d=>!/procedimiento|gu[ií]a|manual|sop/i.test(d.tipo||""));
+      if(ds.length)out.push("<p><b>Documentos:</b></p><ul>"+ds.map(d=>"<li>"+docTxt(d)+"</li>").join("")+"</ul>");
+      if(n.doc&&!D.documentos.some(d=>d.codigo&&n.doc.includes(d.codigo)))faltas.push("La WBS cita «"+n.doc+"», que no está en el registro de documentos.");
+      if(n.tipo!=="documento"&&terminal(n)&&!docsDe(n.id).length&&!propio)faltas.push("¿Con qué documento lo reproduce otro laboratorio?");}
+    if(k==="porque"){
+      const cs=causasDe(n);if(cs.length){if(verFuente("ishikawa")){out.push("<p><b>Causas que lo explican (Ishikawa):</b></p><ul>"+cs.map(c=>"<li>"+esc(c.texto)+" <span class='badge'>"+esc(c.m)+" · "+esc((c.estado||"").replace("_"," "))+"</span></li>").join("")+"</ul>");src.push("Ishikawa");}
+        else out.push("<p class='oculto'>Hay "+cs.length+" causas en un Ishikawa confidencial.</p>");}
+      const am=amfeDe(n);const amv=am.filter(x=>verAmfe(x.A));
+      if(amv.length){out.push("<p><b>Qué puede fallar (AMFE):</b></p><ul>"+amv.map(({f})=>"<li>"+esc(f.modo)+" → "+esc(f.efecto)+" <span class='badge'>NPR "+(f.s*f.o*f.d||"—")+"</span>"+(f.accion?"<br><span class='hint'>Acción: "+esc(f.accion)+"</span>":"")+"</li>").join("")+"</ul>");src.push("AMFE");}
+      else if(am.length)out.push("<p class='oculto'>Hay "+am.length+" modos de falla en un AMFE confidencial.</p>");
+      const f=flujoItem(n.id);if(f&&verFuente("flujo")){if(f.experimento)out.push("<p><b>Experimento:</b> "+esc(f.experimento)+"</p>");if(f.nota)out.push("<p class='hint'>"+esc(f.nota)+"</p>");}
+      if(wbsOk&&n.idef0&&n.idef0.controles)out.push("<p><b>Controles (IDEF0):</b> "+esc(n.idef0.controles)+"</p>");
+      if(!out.length)faltas.push("¿Qué decisión o qué dato justifica este CÓMO?");}
+    if(k==="cuanto"){
+      out.push("<p><b>Madurez:</b> "+(MAD[g.madurez]||"—")+(g.trl?" · TRL "+esc(g.trl):"")+"</p>");if(!g.madurez&&(n.critico||terminal(n)))faltas.push("¿Está validado o es una hipótesis?");
+      const f=flujoItem(n.id);if(f&&verFuente("flujo")){if(f.estado)out.push("<p><b>Estado del paso:</b> "+(f.estado==="congelado"?"congelado":"en desarrollo")+"</p>");
+        if(f.control)out.push("<p>✔ "+(CTL[f.control.tipo]||"")+(f.control.resultado?": "+esc(f.control.resultado):" — todavía sin resultado")+"</p>");}
+      if(wbsOk&&n.vmodel&&(n.vmodel.criterio||n.vmodel.test))out.push("<p><b>V-Model:</b> criterio «"+esc(n.vmodel.criterio||"¿?")+"»"+(n.vmodel.kpi?" · indicador: "+esc(n.vmodel.kpi):"")+(n.vmodel.test?" · prueba: "+esc(n.vmodel.test):"")+"</p>");
+      const nd=causasDe(n).filter(c=>c.estado==="no_dominada");if(nd.length&&verFuente("ishikawa"))out.push("<p class='falta'>"+nd.length+" causa(s) no dominada(s): todavía no se sabe controlarlas.</p>");}
+    return{html:out.join("")+(src.length?"<p class='fuente'>Sale de: "+[...new Set(src)].join(", ")+"</p>":""),faltas,oculta:false};}
+
+  // ---------------------------------------------------------------- vistas
+  function renderArbol(){const box=$("arbol");box.innerHTML="";dfs().forEach(({n,d})=>{const g=g0(n.id),s=semGlob(n);
+    const r=h("div",{"class":n.id===sel?"sel":"",tabindex:"0"});r.style.paddingLeft=(8+d*14)+"px";
+    const dot=h("span",{"class":"dot",title:"Semáforo: "+s});dot.style.background=SEMA[s].h;r.appendChild(dot);
+    r.appendChild(h("span",{"class":"acr"},acr(n)));r.appendChild(h("span",{"class":"nm"},verGlob(n)?n.nombre:n.nombre+" (confidencial)"));
+    if(n.critico)r.appendChild(h("span",{"class":"crit",title:"Crítico"},"★"));if(g.madurez)r.appendChild(h("span",{"class":"badge"},MAD[g.madurez]));
+    const go=()=>{sel=n.id;renderArbol();renderFicha();};r.addEventListener("click",go);r.addEventListener("keydown",e=>{if(e.key==="Enter")go();});box.appendChild(r);});}
+  function renderFicha(){const box=$("ficha");box.innerHTML="";const n=byId(sel)||dfs().map(x=>x.n)[0];if(!n){box.appendChild(h("p",{"class":"hint"},"Importá la WBS del proyecto (JSON de la herramienta WBS) y después el flujo, el Ishikawa, el AMFE y el A3."));return;}sel=n.id;
+    box.appendChild(h("span",{"class":"k"},acr(n)+" · "+(PI[n.pi]||"PI sin definir")+" · semáforo "+semGlob(n)+(n.critico?" · crítico":"")));box.appendChild(h("h3",null,n.nombre));
+    if(document.body.classList.contains("edit")){const b=h("button",{type:"button"},"Editar este globito (madurez, semáforo, textos propios, documentos)");b.addEventListener("click",()=>editGlob(n));box.appendChild(b);}
+    PREG.forEach(([k,t,quien])=>{const c=capa(n,k);const s=h("section",{"class":"capa"});s.appendChild(h("h4",null,t));
+      const body=h("div");body.innerHTML=c.html||"<p class='hint'>—</p>";s.appendChild(body);
+      c.faltas.forEach(f=>s.appendChild(h("p",{"class":"falta"},"Falta: "+f)));s.appendChild(h("p",{"class":"hint",style:"margin:4px 0 0"},"Lo pregunta: "+quien));box.appendChild(s);});}
+  function renderDocPreg(){const s=$("sel-preg");if(!s.options.length)PREG.forEach(([k,t])=>s.appendChild(h("option",{value:k},t)));s.value=preg;
+    const box=$("docpreg");box.innerHTML="";const P=PREG.find(p=>p[0]===preg);
+    box.appendChild(h("h2",null,P[1]+" — para "+{rojo:"autores",amarillo:"el grupo",verde:"el público"}[lector]));
+    box.appendChild(h("p",{"class":"hint"},"Lo pregunta: "+P[2]+". "+LECTOR[lector]));
+    dfs().forEach(({n,d})=>{if(n.tipo==="documento"&&preg!=="para")return;const c=capa(n,preg);
+      const t=h("h3",null,acr(n)+" · "+(c.oculta?n.nombre+" (confidencial)":n.nombre));t.style.marginLeft=(d*10)+"px";box.appendChild(t);
+      const b=h("div",{"class":"capa"});b.innerHTML=c.html||"<p class='hint'>—</p>";c.faltas.forEach(f=>b.appendChild(h("p",{"class":"falta"},"Falta: "+f)));box.appendChild(b);});}
+  const acrs=ids=>ids.map(id=>acr(byId(id))||id).join(", ");
+  function renderDocs(){const tb=$("t-docs");tb.innerHTML="";D.documentos.forEach(d=>{const tr=h("tr"),v=ve(d.semaforo);
+    const td=(t,c)=>{const x=h("td",c?{"class":c}:null);if(t instanceof Node)x.appendChild(t);else x.textContent=t==null?"":t;tr.appendChild(x);};
+    td(d.codigo||"",!d.codigo&&"falta");td(v?d.titulo:"(confidencial)");td(d.tipo);td(d.version);td(EST[d.estado]||d.estado||"",(d.estado==="publicado"&&!d.aprobo)&&"falta");
+    const sd=h("span");const dot=h("span",{"class":"dot"});dot.style.background=(SEMA[d.semaforo]||SEMA.rojo).h;sd.appendChild(dot);sd.appendChild(document.createTextNode(" "+(d.semaforo||"rojo")));td(sd);
+    td(d.elaboro);td(d.reviso);td(d.aprobo);
+    if(d.url&&v){const a=h("a",{href:d.url,target:"_blank",rel:"noopener"},"abrir");td(a);}else td(d.url?"(oculto)":"falta",!d.url&&"falta");td(acrs(d.globitos),"acr");
+    tr.addEventListener("click",()=>editDoc(d));tb.appendChild(tr);});}
+  function renderMat(){const tb=$("t-mat");tb.innerHTML="";D.materiales.forEach(m=>{const tr=h("tr"),v=ve(m.semaforo);const td=t=>{tr.appendChild(h("td",null,t));};
+    td(v?m.nombre:"(confidencial)");td(TIPOS_MAT[m.tipo]||m.tipo);td((m.cantidad||"")+" "+(m.unidad||""));td(m.costo?m.costo+" "+(m.moneda||""):"");td(v?m.proveedor:"(confidencial)");
+    const x=h("td");if(m.url&&v)x.appendChild(h("a",{href:m.url,target:"_blank",rel:"noopener"},"hoja"));tr.appendChild(x);td(acrs(m.globitos));td(m.semaforo||"rojo");
+    tr.addEventListener("click",()=>editMat(m));tb.appendChild(tr);});}
+  function renderPI(){const tb=$("t-pi");tb.innerHTML="";dfs().forEach(({n})=>{const tr=h("tr");const td=(t,c)=>tr.appendChild(h("td",c?{"class":c}:null,t));
+    td(acr(n),"acr");td(verGlob(n)?n.nombre:n.nombre+" (confidencial)");td(n.tipo||"");td(PI[n.pi]||"Sin definir",(!n.pi||n.pi==="sin_definir")&&"falta");td(semGlob(n));td(n.critico?"Sí":"");
+    td(MAD[g0(n.id).madurez]||"—");td(String(docsDe(n.id).length));tr.addEventListener("click",()=>{sel=n.id;show("explorar");renderAll();});tb.appendChild(tr);});}
+
+  // ---------------------------------------------------------------- controles automáticos (preguntas socráticas)
+  function preguntas(){const Q=[],N=dfs().map(x=>x.n);
+    if(!N.length)return[{t:"Importá primero la WBS del proyecto: es el árbol de BIMi."}];
+    ["flujo","ishikawa","amfe","a3"].forEach(k=>{const tiene=k==="amfe"?D.fuentes.amfe.length:D.fuentes[k];
+      if(!tiene)Q.push({t:"Falta importar el "+FUENTE[k]+": "+{flujo:"sin él no hay controles ✔ ni estado de los pasos",ishikawa:"sin él la capa «¿Por qué es así?» queda sin causas",amfe:"sin él no hay modos de falla ni plan de control",a3:"sin él la raíz no dice para qué sirve el proyecto"}[k]+"."});});
+    const crit=N.filter(n=>n.critico);crit.forEach(n=>{const r={g:n.id};if(!g0(n.id).madurez)Q.push({t:"«"+acr(n)+"» es crítico y no tiene madurez: ¿está validado o es una hipótesis?",r});
+      if(!docsDe(n.id).length)Q.push({t:"«"+acr(n)+"» es crítico y no tiene ningún documento enlazado que lo respalde.",r});});
+    const sinDoc=N.filter(n=>!n.critico&&terminal(n)&&n.tipo!=="documento"&&!docsDe(n.id).length);if(sinDoc.length)Q.push({t:sinDoc.length+" globitos terminales no tienen ningún documento enlazado (ver «Matriz de PI»)."});
+    D.documentos.forEach(d=>{const r={d:d.id};if(d.origen==="externo"&&!d.url)Q.push({t:"«"+(d.codigo||d.titulo)+"»: falta el enlace.",r});
+      if(d.estado==="publicado"&&!d.aprobo)Q.push({t:"«"+(d.codigo||d.titulo)+"» figura publicado pero nadie lo aprobó.",r});
+      const rojos=d.globitos.map(byId).filter(n=>n&&semGlob(n)==="rojo");if(d.semaforo==="verde"&&rojos.length)Q.push({t:"Posible fuga: «"+(d.codigo||d.titulo)+"» es verde pero respalda algo rojo ("+rojos.map(acr).join(", ")+").",r});});
+    const sinPI=N.filter(n=>!n.pi||n.pi==="sin_definir");if(sinPI.length)Q.push({t:sinPI.length+" globitos tienen la PI sin definir: quedan en amarillo hasta decidir (paso de protección)."});
+    const F=D.fuentes.flujo;if(F){N.forEach(n=>{const f=flujoItem(n.id);if(f&&f.acr&&n.acr&&f.acr!==n.acr)Q.push({t:"El acrónimo de «"+n.nombre+"» no coincide: «"+n.acr+"» en la WBS y «"+f.acr+"» en el flujo. La WBS es la fuente de verdad.",r:{g:n.id}});});}
+    // Filas del AMFE cuyo paso no está en la WBS: la ruta del AMFE y el árbol no coinciden (la WBS es la fuente de verdad).
+    D.fuentes.amfe.forEach(A=>{const sueltos=[...new Set((A.filas||[]).filter(f=>!N.some(n=>pasoEsDe(A,f.paso,n))).map(f=>{const p=(A.pasos||[]).find(x=>x.id===f.paso);return p?p.texto:f.paso;}))];
+      if(sueltos.length)Q.push({t:"El AMFE «"+((A.doc||{}).codigo||"")+"» tiene filas en pasos que no son globitos de la WBS: "+sueltos.map(s=>"«"+trunc(s,45)+"»").join(", ")+". ¿Faltan en la WBS, o el AMFE usa otra ruta?"});});
+    D.materiales.forEach(m=>{if(!m.globitos.length)Q.push({t:"El material «"+m.nombre+"» no está enlazado a ningún globito.",r:{m:m.id}});});
+    return Q;}
+  function renderPreguntas(){const box=$("preguntas"),Q=preguntas();box.innerHTML="";box.appendChild(h("h2",null,"Preguntas para el equipo ("+Q.length+")"));
+    if(!Q.length){box.appendChild(h("p",{"class":"hint"},"No quedan preguntas abiertas."));return;}
+    const ol=h("ol");Q.forEach(q=>{const li=h("li");if(q.r){const a=h("a",{href:"#"},q.t);a.addEventListener("click",ev=>{ev.preventDefault();
+      if(q.r.g){sel=q.r.g;show("explorar");renderAll();}else if(q.r.d)editDoc(D.documentos.find(d=>d.id===q.r.d));else if(q.r.m)editMat(D.materiales.find(m=>m.id===q.r.m));});li.appendChild(a);}
+      else li.appendChild(document.createTextNode(q.t));ol.appendChild(li);});box.appendChild(ol);}
+  function renderSintesis(){const box=$("sintesis");box.innerHTML="";box.appendChild(h("h2",null,"Síntesis (se calcula sola)"));const add=t=>box.appendChild(h("p",null,t));
+    const N=dfs().map(x=>x.n);if(!N.length){add("Sin WBS todavía.");return;}
+    add(N.length+" globitos · "+N.filter(n=>n.critico).length+" críticos · fuentes: "+Object.keys(FUENTE).filter(k=>k==="amfe"?D.fuentes.amfe.length:D.fuentes[k]).map(k=>FUENTE[k]+(k==="amfe"&&D.fuentes.amfe.length>1?" ×"+D.fuentes.amfe.length:"")).join(", ")+".");
+    const ext=D.documentos.filter(d=>d.origen==="externo");add(D.documentos.length+" documentos ("+(D.documentos.length-ext.length)+" DiDe, "+ext.length+" de afuera): "+Object.keys(EST).map(k=>D.documentos.filter(d=>d.estado===k).length+" "+EST[k].toLowerCase()).join(", ")+".");
+    const conDoc=N.filter(n=>docsDe(n.id).length).length;add("Globitos con al menos un documento: "+conDoc+" de "+N.length+" ("+Math.round(100*conDoc/N.length)+" %).");
+    const pc={};Object.keys(PI).forEach(k=>pc[k]=N.filter(n=>(n.pi||"sin_definir")===k).length);add("PI: "+pc.publico+" públicos, "+pc.secreto+" secretos, "+pc.patente+" candidatos a patente, "+pc.sin_definir+" sin definir.");
+    const md={};N.forEach(n=>{const m=g0(n.id).madurez;if(m)md[m]=(md[m]||0)+1;});add("Madurez declarada: "+(Object.keys(md).length?Object.keys(md).map(k=>md[k]+" "+MAD[k].toLowerCase()).join(", "):"ninguna todavía")+".");
+    if(D.materiales.length){const t={};D.materiales.forEach(m=>{if(+m.costo){t[m.moneda||"$"]=(t[m.moneda||"$"]||0)+(+m.costo)*(+m.cantidad||1);}});add(D.materiales.length+" materiales"+(Object.keys(t).length?"; costo cargado: "+Object.keys(t).map(k=>k+" "+t[k].toLocaleString("es-AR")).join(" + "):"")+".");}
+    let tot=0,ok=0;N.forEach(n=>PREG.forEach(([k])=>{const c=capa(n,k);tot++;if(!c.faltas.length)ok++;}));add("Capas completas (sin «Falta»), vistas por "+{rojo:"autores",amarillo:"el grupo",verde:"el público"}[lector]+": "+ok+" de "+tot+" ("+Math.round(100*ok/tot)+" %).");}
+  function renderDoc(){document.querySelectorAll("[data-f]").forEach(e=>{if(document.activeElement!==e)e.textContent=D.doc[e.dataset.f]==null?"":String(D.doc[e.dataset.f]);});
+    const s=SEMA[D.doc.semaforo]||SEMA.rojo;$("sema").style.borderColor=s.h;$("sema-dot").style.background=s.h;$("sema-txt").textContent=D.doc.semaforo||"rojo";$("sema-txt").style.color=s.h;$("sema-desc").textContent=s.d;$("sema-sel").value=D.doc.semaforo||"rojo";
+    document.querySelectorAll(".lector button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===lector)));$("lector-desc").textContent=LECTOR[lector];
+    document.title="BIMi — "+(D.doc.titulo||"");applyPaper();}
+  function renderRotulos(){document.querySelectorAll("[data-rot]").forEach(r=>{r.innerHTML="";r.appendChild($("tpl-rot").content.cloneNode(true));r.querySelector(".rot-diag").textContent=view==="doc"?r.dataset.rot+": "+PREG.find(p=>p[0]===preg)[1]:r.dataset.rot;
+    r.querySelector(".rot-lector").textContent={rojo:"Autores (rojo)",amarillo:"Grupo (amarillo)",verde:"Público (verde)"}[lector];r.querySelectorAll("[data-f]").forEach(e=>e.textContent=D.doc[e.dataset.f]||"");});}
+  function renderTabs(){const nav=$("tabs");nav.innerHTML="";[["explorar","Explorar"],["doc","Documento por pregunta"],["docs","Registro de documentos"],["mat","Materiales"],["pi","Matriz de PI"]].forEach(([v,t])=>{
+    const b=h("button",{type:"button",role:"tab","aria-selected":String(view===v)},t);b.addEventListener("click",()=>{show(v);renderAll();});nav.appendChild(b);});}
+  function show(v){view=v;document.querySelectorAll(".view").forEach(s=>s.classList.toggle("current",s.dataset.view===view));renderTabs();}
+  function renderAll(){normalize();renderDoc();show(view);renderArbol();renderFicha();renderDocPreg();renderDocs();renderMat();renderPI();renderRotulos();renderPreguntas();renderSintesis();}
+
+  // ---------------------------------------------------------------- diálogos de edición
+  const dlg=$("dlg");
+  function dlgOpen(t){$("dlg-t").textContent=t;$("dlg-b").innerHTML="";$("dlg-f").innerHTML="";if(!dlg.open)dlg.showModal();return $("dlg-b");}
+  function btn(t,c,fn){const b=h("button",{type:"button"},t);if(c)b.className=c;b.addEventListener("click",fn);$("dlg-f").appendChild(b);return b;}
+  function msg(t,x){const b=dlgOpen(t);b.textContent=x;btn("Cerrar","pri",()=>dlg.close());}
+  function field(p,lbl,val,type,opts){const l=h("label",null,lbl);let i;
+    if(type==="select"){i=h("select");opts.forEach(([v,t])=>i.appendChild(h("option",{value:v},t)));i.value=val||"";}
+    else if(type==="area"){i=h("textarea",{rows:"3"});i.value=val||"";}else if(type==="multi"){i=h("select",{multiple:"",size:"8"});opts.forEach(([v,t])=>{const o=h("option",{value:v},t);if((val||[]).includes(v))o.selected=true;i.appendChild(o);});}
+    else{i=h("input",{type:"text"});i.value=val==null?"":val;}l.appendChild(i);p.appendChild(l);return i;}
+  const optsGlob=()=>dfs().map(({n,d})=>[n.id,"\u00a0".repeat(d*2)+acr(n)+" · "+trunc(n.nombre,60)]);
+  const optsSem=[["rojo","rojo"],["amarillo","amarillo"],["verde","verde"]];
+  const editando=()=>document.body.classList.contains("edit");
+  function editGlob(n){const g=G(n.id),b=dlgOpen(acr(n)+" · "+n.nombre);
+    const r=h("div",{"class":"row3"});b.appendChild(r);const fM=field(r,"Madurez",g.madurez,"select",Object.keys(MAD).map(k=>[k,MAD[k]]));const fT=field(r,"TRL (ISO 16290, opcional)",g.trl);
+    const fS=field(r,"Semáforo de este globito",g.semaforo,"select",[["","Automático (por su PI: "+semPI(n)+")"]].concat(optsSem));
+    const fx={};PREG.forEach(([k,t])=>{fx[k]=field(b,"Texto propio · "+t+" (opcional: va antes de lo automático)",(g.textos||{})[k],"area");});
+    b.appendChild(h("p",{"class":"hint"},"Para enlazar documentos o materiales a este globito, abrilos desde «Registro de documentos» o «Materiales»."));
+    btn("Cancelar","",()=>dlg.close());btn("Guardar","pri",()=>{g.madurez=fM.value;g.trl=fT.value.trim();g.semaforo=fS.value;g.textos={};PREG.forEach(([k])=>{const v=fx[k].value.trim();if(v)g.textos[k]=v;});save();dlg.close();renderAll();});}
+  function editDoc(d){const nuevo=!d;if(!editando()&&!nuevo){const b=dlgOpen(d.codigo||d.titulo||"Documento");
+      b.textContent=[["Título",ve(d.semaforo)?d.titulo:"(confidencial)"],["Tipo",d.tipo],["Versión · estado",(d.version||"")+" · "+(EST[d.estado]||"")],["Semáforo",d.semaforo],["Elaboró / revisó / aprobó",[d.elaboro,d.reviso,d.aprobo].map(x=>x||"—").join(" / ")],["Enlace",ve(d.semaforo)?(d.url||"falta"):"(oculto)"],["Globitos",acrs(d.globitos)],["Origen",d.origen==="importado"?"Importado de la herramienta "+(FUENTE[d.fuente]||""):"Documento de afuera"]].map(x=>x[0]+": "+(x[1]||"—")).join("\n");
+      btn("Cerrar","pri",()=>dlg.close());return;}
+    d=d||{id:uid("doc"),codigo:"",titulo:"",tipo:TIPOS_DOC[0],version:"0.1",estado:"en_curso",semaforo:"rojo",elaboro:"",reviso:"",aprobo:"",url:"",globitos:sel?[sel]:[],origen:"externo"};
+    const b=dlgOpen(nuevo?"Documento externo nuevo":(d.codigo||d.titulo));const r1=h("div",{"class":"row3"});b.appendChild(r1);
+    const fC=field(r1,"Código",d.codigo),fV=field(r1,"Versión",d.version),fE=field(r1,"Estado (ISO 19650)",d.estado,"select",Object.keys(EST).map(k=>[k,EST[k]]));
+    const fTi=field(b,"Título",d.titulo);const r2=h("div",{"class":"row2"});b.appendChild(r2);
+    const fTy=field(r2,"Tipo",d.tipo,"select",(TIPOS_DOC.includes(d.tipo)?TIPOS_DOC:[d.tipo].concat(TIPOS_DOC)).map(t=>[t,t])),fS=field(r2,"Semáforo",d.semaforo,"select",optsSem);
+    const r3=h("div",{"class":"row3"});b.appendChild(r3);const fEl=field(r3,"Elaboró",d.elaboro),fRe=field(r3,"Revisó",d.reviso),fAp=field(r3,"Aprobó",d.aprobo);
+    const fU=field(b,"Enlace (URL o ruta del archivo; el archivo no se copia)",d.url);const fG=field(b,"Globitos que respalda (Ctrl + clic para elegir varios)",d.globitos,"multi",optsGlob());
+    if(!nuevo&&d.origen==="externo")btn("Borrar","del",()=>{D.documentos=D.documentos.filter(x=>x!==d);save();dlg.close();renderAll();});
+    btn("Cancelar","",()=>dlg.close());btn("Guardar","pri",()=>{Object.assign(d,{codigo:fC.value.trim(),version:fV.value.trim(),estado:fE.value,titulo:fTi.value.trim(),tipo:fTy.value,semaforo:fS.value,
+      elaboro:fEl.value.trim(),reviso:fRe.value.trim(),aprobo:fAp.value.trim(),url:fU.value.trim(),globitos:Array.from(fG.selectedOptions).map(o=>o.value)});if(nuevo)D.documentos.push(d);save();dlg.close();renderAll();});}
+  function editMat(m){const nuevo=!m;if(!editando()&&!nuevo){msg(m.nombre,"Tipo: "+(TIPOS_MAT[m.tipo]||"")+"\nCantidad: "+(m.cantidad||"")+" "+(m.unidad||"")+"\nCosto: "+(m.costo||"—")+" "+(m.moneda||"")+"\nProveedor: "+(ve(m.semaforo)?m.proveedor||"—":"(confidencial)")+"\nGlobitos: "+acrs(m.globitos));return;}
+    m=m||{id:uid("mat"),nombre:"",tipo:"componente",cantidad:"",unidad:"",costo:"",moneda:"USD",proveedor:"",url:"",globitos:sel?[sel]:[],semaforo:"amarillo"};
+    const b=dlgOpen(nuevo?"Material nuevo":m.nombre);const fN=field(b,"Nombre",m.nombre);const r=h("div",{"class":"row3"});b.appendChild(r);
+    const fT=field(r,"Tipo",m.tipo,"select",Object.keys(TIPOS_MAT).map(k=>[k,TIPOS_MAT[k]])),fQ=field(r,"Cantidad",m.cantidad),fU=field(r,"Unidad",m.unidad);
+    const r2=h("div",{"class":"row3"});b.appendChild(r2);const fC=field(r2,"Costo unitario",m.costo),fMo=field(r2,"Moneda",m.moneda),fS=field(r2,"Semáforo (el proveedor puede ser secreto)",m.semaforo,"select",optsSem);
+    const fP=field(b,"Proveedor",m.proveedor),fH=field(b,"Hoja de datos (enlace)",m.url),fG=field(b,"Globitos donde se usa",m.globitos,"multi",optsGlob());
+    if(!nuevo)btn("Borrar","del",()=>{D.materiales=D.materiales.filter(x=>x!==m);save();dlg.close();renderAll();});
+    btn("Cancelar","",()=>dlg.close());btn("Guardar","pri",()=>{if(!fN.value.trim()){fN.focus();return;}Object.assign(m,{nombre:fN.value.trim(),tipo:fT.value,cantidad:fQ.value.trim(),unidad:fU.value.trim(),costo:fC.value.trim(),moneda:fMo.value.trim(),
+      semaforo:fS.value,proveedor:fP.value.trim(),url:fH.value.trim(),globitos:Array.from(fG.selectedOptions).map(o=>o.value)});if(nuevo)D.materiales.push(m);save();dlg.close();renderAll();});}
+
+  // ---------------------------------------------------------------- importar (cada JSON entra al registro de documentos)
+  function tipoDe(o){if(o.herramienta==="DiDe BIMi")return"bimi";if(o.nodos&&o.etapas)return"flujo";if(o.nodos&&o.nodos.some(n=>"que" in n))return"wbs";
+    if(o.filas&&o.pasos)return"amfe";if(o.causas&&o.doc&&("efecto" in o.doc))return"ishikawa";if(o.cajas)return"a3";if(o.personas)return"concepto";return"";}
+  function estadoDe(d){const v=s=>s&&s!=="—";return v(d.aprobo)?"publicado":v(d.reviso)?"compartido":"en_curso";}
+  function registrar(k,o){const d=o.doc||{},id="dide-"+k+(k==="amfe"?"-"+(d.codigo||D.fuentes.amfe.length):"");let r=D.documentos.find(x=>x.id===id);
+    const nom={wbs:"WBS y Diccionario",flujo:"Flujo del proyecto",ishikawa:"Ishikawa 6M",amfe:(d.tipo==="diseno"?"AMFE de diseño":"AMFE de proceso y plan de control"),a3:"A3",concepto:"Concepto"}[k];
+    const root=dfs().map(x=>x.n)[0];const base={codigo:d.codigo||"",titulo:(d.titulo||nom),tipo:"DiDe · "+nom,version:d.version||"",estado:estadoDe(d),semaforo:d.semaforo||"rojo",
+      elaboro:d.elaboro||"",reviso:d.reviso&&d.reviso!=="—"?d.reviso:"",aprobo:d.aprobo&&d.aprobo!=="—"?d.aprobo:"",origen:"importado",fuente:k};
+    if(r)Object.assign(r,base);else{r=Object.assign({id,url:"",globitos:root?[root.id]:[]},base);D.documentos.push(r);}}
+  const esEjemplo=()=>D.doc.codigo===ORIG.doc.codigo;
+  function importar(lista){const res=[];let nuevaWBS=null;
+    lista.sort((a,b)=>(tipoDe(b.o)==="wbs")-(tipoDe(a.o)==="wbs"));   // la WBS primero: es el árbol
+    for(const {nombre,o} of lista){const k=tipoDe(o);
+      if(!k){res.push("«"+nombre+"»: no lo reconozco (WBS, flujo, Ishikawa, AMFE, A3, Concepto o BIMi).");continue;}
+      if(k==="bimi"){if(!esEjemplo()&&D.doc.codigo&&D.doc.codigo!==o.doc.codigo&&!confirm("En este navegador está abierto «"+D.doc.codigo+"». Si no lo exportaste, cancelá y exportá su JSON antes. ¿Reemplazarlo por «"+(o.doc.codigo||nombre)+"»?")){res.push("«"+nombre+"»: no se cargó.");continue;}
+        D=o;normalize();res.push("«"+nombre+"»: BIMi cargado.");continue;}
+      if(k==="wbs"){const d=o.doc||{},acrP=d.acronimo||String(d.codigo||"").split("-")[0]||"PROYECTO",cod=acrP+"-BIMi-01";
+        if(esEjemplo()||(D.doc.codigo&&D.doc.codigo!==cod&&confirm("Se arma el BIMi de «"+acrP+"» y se reemplaza el abierto («"+D.doc.codigo+"»). Si no lo exportaste, cancelá y exportá su JSON antes. ¿Seguir?"))||!D.doc.codigo){
+          D={herramienta:"DiDe BIMi",version_formato:1,doc:{codigo:cod,version:"0.1",fecha:hoy(),estado:"Borrador",semaforo:d.semaforo||"rojo",titulo:(d.titulo||acrP),acronimo:acrP,
+            elaboro:d.elaboro||"",reviso:"—",aprobo:"—",autores:d.autores||"",origen:"Armado con las fuentes DiDe del proyecto ("+hoy()+")."},fuentes:{amfe:[]},documentos:[],materiales:[],globitos:{}};nuevaWBS=acrP;}
+        else if(D.doc.codigo!==cod){res.push("«"+nombre+"»: no se cargó.");continue;}
+        D.fuentes.wbs=o;registrar("wbs",o);res.push("«"+nombre+"»: WBS con "+(o.nodos||[]).length+" globitos.");continue;}
+      if(esEjemplo()||!D.fuentes.wbs){res.push("«"+nombre+"»: primero importá la WBS del proyecto (es el árbol de BIMi).");continue;}
+      if(k==="amfe"){const i=D.fuentes.amfe.findIndex(A=>(A.doc||{}).codigo===(o.doc||{}).codigo);if(i>=0)D.fuentes.amfe[i]=o;else D.fuentes.amfe.push(o);}else D.fuentes[k]=o;
+      registrar(k,o);res.push("«"+nombre+"»: "+FUENTE[k]+(k==="amfe"&&o.doc&&o.doc.tipo==="diseno"?" de diseño":"")+" ("+((o.doc||{}).codigo||"sin código")+").");}
+    sel=null;save();renderAll();msg("Importación",(nuevaWBS?"BIMi nuevo de «"+nuevaWBS+"», semáforo "+D.doc.semaforo+".\n\n":"")+res.join("\n"));}
+  $("f-imp").addEventListener("change",async function(){const files=Array.from(this.files);this.value="";const lista=[];
+    for(const f of files){try{lista.push({nombre:f.name,o:JSON.parse(await f.text())});}catch(e){lista.push({nombre:f.name,o:{}});}}importar(lista);});
+
+  // ---------------------------------------------------------------- exportar
+  const slug=()=>(D.doc.codigo||"BIMi").replace(/[^A-Za-z0-9._-]+/g,"_");
+  function download(name,text,type){const a=h("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  const csvCell=v=>{v=String(v==null?"":v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const csv=rows=>"\uFEFF"+rows.map(r=>r.map(csvCell).join(";")).join("\n");
+  const txt=html=>{const d=h("div");d.innerHTML=html.replace(/<\/(p|li)>/g,"\n").replace(/<br>/g,"\n");return d.textContent.replace(/\n{2,}/g,"\n").trim();};
+  $("sel-exp").addEventListener("change",function(){const v=this.value;this.value="";
+    if(v==="json")download(slug()+".json",JSON.stringify(D,null,1),"application/json");
+    if(v==="docs")download(slug()+"_Registro-documentos.csv",csv([["Código","Título","Tipo","Versión","Estado","Semáforo","Elaboró","Revisó","Aprobó","Enlace","Globitos","Origen"]].concat(D.documentos.map(d=>[d.codigo,d.titulo,d.tipo,d.version,EST[d.estado]||d.estado,d.semaforo,d.elaboro,d.reviso,d.aprobo,d.url,acrs(d.globitos),d.origen]))),"text/csv");
+    if(v==="mat")download(slug()+"_Materiales.csv",csv([["Material","Tipo","Cantidad","Unidad","Costo unitario","Moneda","Proveedor","Hoja de datos","Globitos","Semáforo"]].concat(D.materiales.map(m=>[m.nombre,TIPOS_MAT[m.tipo]||m.tipo,m.cantidad,m.unidad,m.costo,m.moneda,m.proveedor,m.url,acrs(m.globitos),m.semaforo]))),"text/csv");
+    if(v==="pi")download(slug()+"_Matriz-PI.csv",csv([["Acrónimo","Globito","Tipo","PI","Semáforo","Crítico","Madurez","Documentos"]].concat(dfs().map(({n})=>[acr(n),n.nombre,n.tipo,PI[n.pi]||"Sin definir",semGlob(n),n.critico?"Sí":"",MAD[g0(n.id).madurez]||"",docsDe(n.id).map(d=>d.codigo).join(", ")]))),"text/csv");
+    if(v==="md"){const P=PREG.find(p=>p[0]===preg);let s="# "+(D.doc.titulo||"BIMi")+" — "+P[1]+"\n\n*"+(D.doc.codigo||"")+" v"+(D.doc.version||"")+" · "+hoy()+" · Para: "+{rojo:"autores",amarillo:"el grupo",verde:"el público"}[lector]+" · Semáforo del documento: "+lector+"*\n\n> "+LECTOR[lector]+"\n";
+      dfs().forEach(({n})=>{if(n.tipo==="documento"&&preg!=="para")return;const c=capa(n,preg);s+="\n## "+acr(n)+" · "+(c.oculta?n.nombre+" (confidencial)":n.nombre)+"\n\n"+txt(c.html)+"\n"+c.faltas.map(f=>"\n**Falta:** "+f+"\n").join("");});
+      download(slug()+"_"+preg+"_"+lector+".md",s+"\n---\n*BIMi DiDe — CaPI*\n","text/markdown");}});
+
+  // ---------------------------------------------------------------- impresión, edición y arranque
+  const cssStr=s=>'"'+String(s||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/[\r\n]+/g," ")+'"';
+  function applyPaper(){const d=D.doc,box="font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;";
+    $("papel").textContent="@page{size:A4 portrait;margin:10mm 10mm 10mm 20mm;@top-left{content:"+cssStr((d.codigo||"")+" · BIMi DiDe · "+(d.titulo||""))+";"+box+"}@top-right{content:"+cssStr("Versión "+(d.version||"")+" · "+(d.fecha||""))+";"+box+"}"+
+      "@bottom-left{content:"+cssStr("Para: "+{rojo:"autores",amarillo:"el grupo",verde:"el público"}[lector]+" · Elaboró: "+(d.elaboro||""))+";"+box+"}@bottom-right{content:\"Página \" counter(page) \" de \" counter(pages);"+box+"}}";}
+  function bindDocFields(){document.querySelectorAll(".headdoc [data-f]").forEach(e=>{e.contentEditable=editando()?"true":"false";});}
+  document.querySelectorAll(".headdoc [data-f]").forEach(e=>e.addEventListener("input",()=>{D.doc[e.dataset.f]=e.textContent;save();renderRotulos();applyPaper();}));
+  $("sema-sel").addEventListener("change",function(){D.doc.semaforo=this.value;save();renderDoc();});
+  $("b-edit").addEventListener("click",function(){const on=!editando();document.body.classList.toggle("edit",on);this.setAttribute("aria-pressed",String(on));bindDocFields();renderFicha();});
+  $("b-doc").addEventListener("click",()=>editDoc(null));$("b-mat").addEventListener("click",()=>editMat(null));
+  $("d-x").addEventListener("click",()=>dlg.close());
+  $("sel-preg").addEventListener("change",function(){preg=this.value;renderAll();});
+  document.querySelectorAll(".lector button").forEach(b=>b.addEventListener("click",()=>{lector=b.dataset.v;renderAll();}));
+  $("b-print").addEventListener("click",()=>{renderRotulos();window.print();});
+  $("b-reset").addEventListener("click",()=>{const b=dlgOpen("Volver a los datos del archivo");b.textContent="Se pierden los cambios guardados en este navegador. Exportá antes el JSON si los querés conservar.";
+    btn("Cancelar","",()=>dlg.close());btn("Volver","del",()=>{try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);normalize();sel=null;dlg.close();renderAll();});});
+  const m=location.hash.match(/^#doc:(\w+):(\w+)/);if(m){view="doc";preg=m[1];lector=LV[m[2]]!=null?m[2]:"rojo";}
+  load();renderAll();
+  window.DiDeBIMi={datos:()=>D,capa:(id,k)=>capa(byId(id),k),preguntas,lector:v=>{lector=v;renderAll();}};
+})();
+</script>
+</body>
+</html>

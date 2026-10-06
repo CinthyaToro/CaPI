@@ -25,7 +25,7 @@ desde el primer lote como si fuéramos a calificar. Ver
 | 5 | AMFE de proceso y plan de control | ¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla? (Con la WBS, también el AMFE de diseño: una fila por función.) | [Herramienta](Herramientas/DiDe_AMFE.html) |
 | 6 | WBS constructible | ¿Qué hay que hacer en cada parte, y cómo se hace? | [Herramienta](Herramientas/DiDe_WBS.html) · [Guía](Plantillas/CaPI-Universal_03-Guia-WBS-Constructible.md) |
 | 7 | Diccionario de WBS | ¿Cómo se llama cada parte, y qué significa? | [Herramienta](Herramientas/DiDe_WBS.html) · [Plantilla](Plantillas/CaPI-Universal_04-WBS-Dictionary.md) |
-| 8 | BIM tecnológico | ¿Qué documentación necesita cada tipo de usuario? | Próximamente |
+| 8 | BIMi (BIM de investigación) | ¿Qué necesita saber cada persona que lee, y con qué documento se respalda? | [Herramienta](Herramientas/DiDe_BIMi.html) |
 
 ## Qué hay en este repositorio
 
@@ -33,8 +33,8 @@ desde el primer lote como si fuéramos a calificar. Ver
 |---|---|
 | `Plantillas/` | Modelos en blanco: encuesta de Concepto, A3, guía de WBS constructible y Diccionario de WBS. |
 | `Herramientas/` | Herramientas DiDe: cada una es un solo archivo HTML que se abre en el navegador, sin instalar nada. Se editan, se guardan solas en tu computadora, importan y exportan JSON y CSV, y se imprimen en A4 con márgenes ISO 5457 y "Página n de N". Cada una trae un ejemplo resuelto y una lista de preguntas para el equipo. |
-| `Ejemplos/SincLE/` | El A3 de **SincLE**, un sistema que sincroniza un láser y un espectrómetro LIBS (HTML editable, Markdown y PDF). |
-| `Ejemplos/CeSoTe/` | La ruta DiDe completa aplicada a **CeSoTe**, un ejercicio con perfiles ficticios sobre fabricación de celdas solares terrestres. |
+| `Ejemplos/SincLE/` | **SincLE**, un sistema que sincroniza un láser y un espectrómetro LIBS: el A3 (HTML editable, Markdown y PDF) y la WBS con su Diccionario. Su BIMi es el ejemplo que trae la herramienta BIMi; los demás pasos, los ejemplos de cada herramienta. |
+| `Ejemplos/CeSoTe/` | La ruta DiDe completa, hasta el BIMi, aplicada a **CeSoTe**, un ejercicio con perfiles ficticios sobre fabricación de celdas solares terrestres. |
 | `Guias/` | Recomendaciones de método. |
 
 Las plantillas usan ejemplos de **otro** proyecto a propósito: muestran el nivel de detalle esperado sin que se
@@ -49,7 +49,7 @@ pueda copiar la respuesta.
    «Exportar .md» lo deja listo para el paso siguiente («Exportar .json» sirve para volver a abrirlo).
 3. Abrí la herramienta de flujo del proyecto. Con "Esqueleto desde Concepto y A3" arma un primer borrador por reglas,
    sin IA y sin enviar datos afuera; después pregunta lo que no puede decidir.
-4. Seguí con el Ishikawa, el AMFE, la WBS y el Diccionario. Cada herramienta importa lo que exportó la anterior; si lo abierto es el ejemplo, arma una carátula nueva y no lo mezcla con tu proyecto.
+4. Seguí con el Ishikawa, el AMFE, la WBS, el Diccionario y el BIMi. Cada herramienta importa lo que exportó la anterior; si lo abierto es el ejemplo, arma una carátula nueva y no lo mezcla con tu proyecto.
 
 Lo que produce cada grupo es **suyo y confidencial**: no lo subas a un repositorio público hasta saber qué partes
 conviene proteger. Las herramientas guardan los datos sólo en tu navegador.

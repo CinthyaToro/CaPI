@@ -29,6 +29,7 @@ La marca **CT** indica lo que agregó la autora de CaPI.
 | 4 | Ishikawa 6M | [CeSoTe_Ishikawa_v0.html](CeSoTe_Ishikawa_v0.html) |
 | 5 | AMFE de proceso y plan de control | [CeSoTe_AMFE-Proceso_v0.md](CeSoTe_AMFE-Proceso_v0.md) · [en la herramienta](CeSoTe_AMFE_v0.html) |
 | 6–7 | WBS y Diccionario | [CeSoTe_WBS_v0.html](CeSoTe_WBS_v0.html) |
+| 8 | BIMi: las cinco preguntas de cada parte, filtradas por quién lee | [CeSoTe_BIMi_v0.html](CeSoTe_BIMi_v0.html) |
 
 Los archivos `.json` son los datos de cada herramienta: se pueden importar en las herramientas de la carpeta
 [`Herramientas/`](../../Herramientas/).
