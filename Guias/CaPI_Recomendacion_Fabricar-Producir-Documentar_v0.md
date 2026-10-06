@@ -66,15 +66,23 @@ Si no queda escrito qué pasó con cada pieza, perdemos tres cosas:
 | **Validación** | ¿El método o el resultado sirven para el uso previsto? |
 | **Calificación** | ¿El diseño o el proceso aguantan el ambiente real, con margen? |
 
-## Un ejemplo: celdas solares para el espacio
+## Un ejemplo: un detector infrarrojo hecho en el laboratorio que va al espacio
 
-Una celda hecha en el laboratorio difícilmente alimente un satélite: para eso tiene que pasar una calificación
-completa, que pide más de cien celdas sólo para los ensayos. Hay un camino intermedio: **volar las celdas como
-experimento**. Van como carga útil, se mide su rendimiento en órbita y no alimentan la nave. Igual tienen que
-soportar el lanzamiento y no poner en riesgo la misión.
+Un grupo fabrica en su laboratorio un chip detector de infrarrojo. Para que un satélite lo use como instrumento
+(por ejemplo, para hacer mapas térmicos), el chip tendría que pasar una calificación completa, con muchas unidades
+ensayadas y una ruta de fabricación congelada.
+
+Hay un camino intermedio: **volar el chip como demostración tecnológica**. En ese vuelo no importan los datos
+infrarrojos. Importa saber si el chip:
+- **sobrevive** al lanzamiento;
+- **recibe comandos** y **transmite** datos desde la órbita;
+- **se calienta** con los ciclos de sol y sombra, y **sigue funcionando** igual.
+
+Igual tiene que soportar el lanzamiento y no poner en riesgo la misión.
 
 En los dos casos, lo que abre la puerta es lo mismo: **una ruta de fabricación escrita y trazable desde el primer
-lote.**
+lote.** Si el chip anda bien en órbita, el grupo tiene que poder decir exactamente cómo lo hizo para fabricar el
+siguiente igual.
 
 ---
 
