@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concepto DiDe</title>
+<!--
+  HERRAMIENTA "CONCEPTO" DiDe — v0.1 (06/10/2026) — Cinthya Toro · CaPI / DiDe
+  Paso 1 de la ruta DiDe: Concepto → A3 → Flujo del proyecto → Ishikawa → AMFE y plan de control → WBS → Diccionario → BIM
+
+  La encuesta de Concepto (32 preguntas literales, en dos etapas) con un ejemplo resuelto de SincLE en cada pregunta.
+  Se responde en el navegador, se guarda sola, y deja las respuestas listas para la herramienta siguiente:
+    - CSV con las mismas columnas que el formulario de Google (lo leen la herramienta A3 y la de Flujo del proyecto);
+    - Word (.docx) con preguntas, ejemplos y respuestas;
+    - documento narrativo "Idea-Proyecto" (Markdown e impresión A4).
+  Importa el CSV que exporta Google Forms (Etapa I y/o II): cada fila es una persona; se pueden juntar varias.
+
+  FORMATO JSON
+  { "doc": { codigo, version, fecha, estado, semaforo, titulo, elaboro, reviso, aprobo, origen },
+    "personas": [ { id, nombre, r: { "1": "...", …, "32": "..." } } ] }
+-->
+<style>
+  :root{color-scheme:light;--ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--muted:#615d54;--line:#cfc9b8;--teal:#1f6b62;--tealbg:#e3efec;--warn:#b58500;--nd:#b3261e;--hl:#fffbe8;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif)}
+  button,select,input,textarea{font:inherit}
+  .bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 18px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:13px}
+  .bar .grow{flex:1}
+  .bar button,.bar label.btn,.bar select{font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .bar button.ghost{background:transparent;color:#fff}
+  .bar input[type=file]{display:none}
+  .page{max-width:1200px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .headdoc{background:var(--paper);border:1px solid var(--ink);padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0}
+  h1{font-size:23px;line-height:1.2;margin:0}
+  .ctrl{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--ink);font-size:13px}
+  .ctrl div{padding:5px 8px;border-right:1px solid var(--ink);min-width:0}.ctrl div:last-child{border-right:0}
+  .ctrl input,.ctrl select{width:100%;border:0;border-bottom:1px dotted var(--teal);background:var(--hl);font-size:13px;padding:1px 2px}
+  .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .hint{color:var(--muted);font-size:12.5px;font-family:var(--sans)}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--sans);font-size:13.5px}
+  .tabs button{border:1px solid var(--ink);background:var(--paper);border-radius:5px 5px 0 0;padding:6px 12px;cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+  .tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--sans);font-size:13px}
+  .tools select,.tools button{border:1px solid var(--line);border-radius:4px;padding:4px 8px;background:var(--paper);cursor:pointer}
+  .view{display:none;background:var(--paper);border:1px solid var(--ink);padding:16px 20px}
+  .view.current{display:block}
+  .bloque{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);border-bottom:2px solid var(--teal);padding-bottom:4px;margin:22px 0 6px}
+  .bloque:first-child{margin-top:0}
+  .bloque-ayuda{font-family:var(--sans);font-size:13px;color:var(--muted);margin:0 0 10px}
+  .q{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:14px;align-items:start;padding:12px 0;border-bottom:1px solid var(--line)}
+  .q h3{font-size:15.5px;margin:0 0 6px;line-height:1.3}
+  .q h3 .req{color:var(--nd)}
+  .q textarea{width:100%;min-height:90px;border:1px solid var(--line);border-radius:5px;padding:7px 9px;font-family:var(--serif);font-size:15px;line-height:1.45;resize:vertical;background:#fffef9}
+  .q textarea.corta{min-height:0;height:40px}
+  .q .ej{background:var(--tealbg);border-left:3px solid var(--teal);border-radius:4px;padding:8px 10px;font-family:var(--sans);font-size:13px;line-height:1.45;white-space:pre-line}
+  .q .ej b{color:var(--teal)}
+  .q .vacia{border-color:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:13px;font-family:var(--sans)}
+  th,td{text-align:left;vertical-align:top;padding:5px 7px;border:1px solid var(--line);white-space:pre-line}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:#faf8f2}
+  td.falta{color:var(--warn)}
+  .doc h1{font-size:24px;margin:0 0 4px}
+  .doc h2{font-size:17px;color:var(--teal);border-bottom:1px solid var(--line);padding-bottom:3px;margin:20px 0 8px}
+  .doc h3{font-size:14px;margin:12px 0 4px;font-family:var(--sans)}
+  .doc p{margin:0 0 6px;line-height:1.5;white-space:pre-line}
+  .doc .quien{font-family:var(--sans);font-size:12px;color:var(--teal);font-weight:600}
+  .below{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:14px}
+  .box{background:var(--paper);border:1px solid var(--ink);border-radius:5px;padding:10px 13px;font-size:14px;line-height:1.45;font-family:var(--sans)}
+  .box h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px;color:var(--teal)}
+  .box ol{margin:0;padding-left:20px}.box li a{color:var(--ink);text-decoration:underline dotted}.box p{margin:0 0 6px}
+  .bars{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line);margin:4px 0 8px}
+  .bars span{background:var(--teal)}
+  dialog{border:1px solid var(--ink);border-radius:8px;padding:0;max-width:560px;width:94vw;font-family:var(--sans)}
+  dialog::backdrop{background:rgba(20,18,14,.45)}
+  .dlg-h{padding:12px 16px;border-bottom:1px solid var(--line)}.dlg-h h3{margin:0;font-size:17px}
+  .dlg-b{padding:12px 16px;display:grid;gap:9px;font-size:14px;white-space:pre-line}
+  .dlg-b input{border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-size:14px}
+  .dlg-f{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+  .dlg-f button{padding:6px 12px;border-radius:4px;border:1px solid var(--ink);background:#fff;cursor:pointer}
+  .dlg-f button.pri{background:var(--ink);color:#fff}.dlg-f button.del{border-color:var(--nd);color:var(--nd);margin-right:auto}
+  @media (max-width:760px){.q{grid-template-columns:1fr}.ctrl{grid-template-columns:1fr 1fr}}
+  @media print{
+    body{background:#fff}
+    .bar,.headdoc,.tabs,.tools,.below,dialog{display:none!important}
+    .page{display:block;padding:0;max-width:none}
+    .view{display:none!important;border:0;padding:0}
+    .view.current{display:block!important}
+    .q{break-inside:avoid;grid-template-columns:1fr 1fr}
+    .q textarea{border:1px solid #999;min-height:0;height:auto;overflow:visible}
+    .doc h2{break-after:avoid}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="papel"></style>
+</head>
+<body>
+<div class="bar">
+  <strong>Concepto DiDe</strong>
+  <label>Persona <select id="sel-p" aria-label="Persona que responde"></select></label>
+  <button type="button" id="b-new">+ Persona</button>
+  <button type="button" id="b-blank">Empezar en blanco</button>
+  <span class="grow"></span>
+  <label class="btn" for="f-imp">Importar (CSV de Google o JSON)</label><input type="file" id="f-imp" accept=".csv,.json" multiple>
+  <select id="sel-exp" aria-label="Exportar">
+    <option value="">Exportar…</option>
+    <option value="csv">Respuestas (.csv, como Google Forms) → A3 y Flujo</option>
+    <option value="docx">Cuestionario de esta persona (.docx)</option>
+    <option value="docxdoc">Documento Idea-Proyecto (.docx)</option>
+    <option value="md">Documento Idea-Proyecto (.md)</option>
+    <option value="json">Datos (.json)</option>
+  </select>
+  <button type="button" id="b-print">Imprimir esta vista</button>
+  <button type="button" id="b-reset" class="ghost">Volver a los datos del archivo</button>
+</div>
+
+<main class="page">
+  <section class="headdoc" aria-label="Control documental">
+    <p class="kicker">DiDe — Paso 1 · Encuesta de Concepto</p>
+    <h1 id="h-titulo"></h1>
+    <div class="ctrl">
+      <div><span class="k">Código</span><input data-f="codigo" aria-label="Código"></div>
+      <div><span class="k">Versión</span><input data-f="version" aria-label="Versión"></div>
+      <div><span class="k">Fecha</span><input data-f="fecha" aria-label="Fecha"></div>
+      <div><span class="k">Elaboró</span><input data-f="elaboro" aria-label="Elaboró"></div>
+      <div><span class="k">Revisó</span><input data-f="reviso" aria-label="Revisó"></div>
+      <div><span class="k">Semáforo</span><select data-f="semaforo" aria-label="Semáforo"><option value="rojo">rojo · autor/a y capacitadora</option><option value="amarillo">amarillo · el grupo</option><option value="verde">verde · público</option></select></div>
+    </div>
+    <p class="hint" style="margin:0">Cada pregunta trae un ejemplo resuelto de <b>SincLE</b>, otro proyecto a propósito: muestra cuánto detalle se espera, no qué contestar. Las respuestas se guardan solas en este navegador y no salen de tu computadora.</p>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div class="tools" id="tools">
+    <label>Etapa <select id="fl-etapa"><option value="">las dos</option><option value="I">I · La Idea (1 a 21)</option><option value="II">II · El Proyecto (22 a 32)</option></select></label>
+    <label><input type="checkbox" id="fl-vacias"> sólo las que faltan</label>
+  </div>
+
+  <section class="view" data-view="responder" id="v-resp" aria-label="Responder"></section>
+  <section class="view" data-view="grupo" aria-label="Respuestas del grupo"><div id="v-grupo"></div></section>
+  <section class="view doc" data-view="doc" aria-label="Documento Idea-Proyecto"><div id="v-doc"></div></section>
+
+  <div class="below"><div class="box" id="preguntas"></div><div class="box" id="sintesis"></div></div>
+</main>
+<dialog id="dlg"><div class="dlg-h"><h3 id="dlg-t"></h3></div><div class="dlg-b" id="dlg-b"></div><div class="dlg-f" id="dlg-f"></div></dialog>
+
+<!-- DATOS: ejemplo resuelto (SincLE, público). «Empezar en blanco» lo deja vacío para el proyecto propio. -->
+<script id="datos" type="application/json">
+{
+ "doc": {"codigo": "SincLE-CON-01", "version": "0.1", "fecha": "2026-10-06", "estado": "Ejemplo resuelto", "semaforo": "verde",
+  "titulo": "SincLE", "elaboro": "Cinthya Toro", "reviso": "—", "aprobo": "—",
+  "origen": "Respuestas del Concepto de SincLE (0_Concepto-SincLE), las mismas que se usan como ejemplo en cada pregunta."},
+ "personas": [
+  {"id": "p1", "nombre": "Cinthya Toro", "r": {
+   "1": "Cinthya Toro", "2": "Todo: diseño, electrónica y programación.", "3": "(no se muestra en el ejemplo)", "4": "La Salle 4397, CP1603 (Villa Martelli, Pcia. Bs. As.) — CITEDEF.", "5": "Villa Martelli, Pcia. Bs. As.", "6": "Argentina",
+   "7": "Sistema de Sincronización Láser-Espectrómetro. Acrónimo: SincLE.",
+   "8": "SincLE afecta a CITEDEF, CNEA, al sistema microLIBS y a otros laboratorios e institutos que pudieran utilizar/necesitar un sistema de sincronización de alta resolución temporal.",
+   "9": "El impacto de SincLE es directo en la sincronización del láser EKSPLA y del espectrómetro LIBS2500+, ya que ambos equipos necesitan un sistema que los sincronice con pocos microsegundos de retardo.",
+   "10": "Sí, el económico, porque hacer SincLE costaría menos de 50 mil y comprar un generador de pulsos sale por lo menos 500 mil.",
+   "11": "Sí, una versión de sincronización con otro láser se demoró 6 meses en implementar.",
+   "12": "Sí, es simple porque se utilizaría la plataforma Arduino. Es económico porque se tendrían que comprar componentes como resistencias, optoacopladores, etc., que son económicos.",
+   "13": "Durará mucho tiempo y se podrían pasar a doctorandos para que implementen ajustes y generen nuevos experimentos.",
+   "14": "Compite con fabricantes de sistemas electrónicos de sincronización, como generadores de pulsos y generadores de señales de sincronización.",
+   "15": "Se diferencia en que los sistemas comerciales no son open source y no se pueden especificar para una tesis doctoral. Pero el diferencial es más interesante: genera conocimiento y podría llegar a necesitar protección de PI.",
+   "16": "La idea es que este sistema, en principio, sincronice con una resolución de 10 us a 1 us un láser EKSPLA y un espectrómetro LIBS2500+. Se puede programar un Arduino para que saque pulsos TTL por dos de sus pines con diferencia de microsegundos, de tal forma que se pueda modificar ese valor para cada experimento.",
+   "17": "Los instrumentos que sincronizará son del 2000 y ambos sólo funcionan como Master cuando se los requiere sincronizar. Como solución se quiere implementar un sistema que los sincronice con hardware, porque con el control por software no se alcanza la resolución de microsegundos que se requiere para hacer LIBS.",
+   "18": "CITEDEF, CNEA y el sistema científico argentino (doctores, doctorandos, ingenieros, técnicos, biólogos, etc.).",
+   "19": "Diseñar el sistema con DiDe.\nImplementar la primera versión: SincLEv1.\nValidar SincLEv1.\nAgregar SincLEv1 al sistema microLIBS.\nMejorarlo para que sea un sistema de sincronización general.",
+   "20": "Que el láser EKSPLA dispare, que se pueda hacer un barrido de tiempos en microsegundos, y que el espectrómetro LIBS2500+ lea a esas diferencias temporales en forma real. Se mediría comparando espectros medidos a diferentes tiempos con la base del NIST o con modelos espectrales.",
+   "21": "SincLE, Sincroniza la Luz para ver más allá de lo Evidente.",
+   "22": "Tenemos un Arduino Mega, los instrumentos y el programa. Se requiere personal con conocimientos en programación e instrumentación, y los componentes electrónicos para acoplar el sistema Arduino al láser y al espectrómetro. Con $50.000 alcanzaría.",
+   "23": "Se podría pasar a un ESPCAM para agregar visión a la sincronización. Se requieren $100.000.",
+   "24": "Sí.", "25": "Sí, laboratorios que utilizan instrumentación para armar sistemas complejos, de Argentina y de la región.",
+   "26": "Sí, a nivel Latinoamérica, porque los investigadores no cuentan con presupuestos para adquirir sistemas comerciales que salen desde US$600 hasta US$5000.",
+   "27": "Sí.", "28": "Subsidios de institutos de investigación, concursos de innovación.", "29": "De concursos y/o del Estado.", "30": "De concursos y/o del Estado.",
+   "31": "De concursos y/o del Estado, de empresas privadas.", "32": "Ministerio de Defensa, CONICET, universidades, escuelas técnicas, laboratorios biológicos."}}
+ ]
+}
+</script>
+
+<script>
+(function(){
+  "use strict";
+  // Preguntas literales del formulario de Concepto de DiDe (igual que en CaPI_CrearGoogleForm_Concepto.gs).
+  const B=[
+   {e:"I",t:"Bloque 1 — Datos del encuestado",a:"Quién sos y qué parte del proyecto hacés."},
+   {e:"I",t:"Bloque 2 — Inicio de la Idea",a:"Todo inicia cuando se lo nombra."},
+   {e:"I",t:"Bloque 3 — Filtros posibilitantes",a:"Para responder estas 6 preguntas, imaginá que tenés recursos y capacidades infinitas. Es momento de ver la idea en su mejor versión posible; la realidad se aterriza en los bloques siguientes."},
+   {e:"I",t:"Bloque 4 — Posicionamiento",a:""},
+   {e:"I",t:"Bloque 5 — Descripción técnica",a:""},
+   {e:"I",t:"Bloque 6 — La frase",a:"Va al final a propósito: recién después de describir todo se puede resumir en una línea."},
+   {e:"II",t:"Bloque 7 — Recursos y escalabilidad",a:""},
+   {e:"II",t:"Bloque 8 — Financiamiento",a:"Nadie tiene por qué saber de fondos. Si no sabés, escribí «no sé»: el hueco marcado sirve más que un dato inventado."}];
+  const Q=[
+   [1,0,"1. Nombre","Tu nombre y apellido.",1,1],
+   [2,0,"2. Tu parte o rol dentro del proyecto","Qué parte específica hacés vos. Si estás solo/a en el proyecto, escribí «todo».\n\nEjemplo de formato (SincLE): «Electrónica — armo el acople de señales y programo el Arduino.»",1,1],
+   [3,0,"3. Dirección de correo electrónico","Ejemplo: nombre@institucion.org",1,1],
+   [4,0,"4. Dirección","Es la dirección del instituto o lugar de trabajo.",0,1],
+   [5,0,"5. Ciudad","",0,1],[6,0,"6. País","",0,1],
+   [7,1,"7. Concepto de la idea: Define un nombre para la idea/proyecto/sistema y luego un acrónimo","El nombre no es un detalle decorativo: ponerle nombre propio a la idea es el primer paso para poder hablar de ella como una cosa que existe y se puede proteger.",1,0],
+   [8,2,"8. Alcance","¿A cuántas personas afectaría este proyecto?",1,0],
+   [9,2,"9. Impacto","¿Qué impacto tendrá en las personas/sociedad? ¿Es urgente cubrir esta necesidad? Explícalo.",1,0],
+   [10,2,"10. Dolores","¿Cubre algún dolor de las personas/sociedad?",1,0],
+   [11,2,"11. Posibilidad de realización","¿Se puede implementar esta idea-proyecto dentro de un año o dos?",1,0],
+   [12,2,"12. Eficacia","¿Es simple y rentable la idea? Explícalo.",1,0],
+   [13,2,"13. Efecto","¿Cuánto durarán los resultados de esta idea?",1,0],
+   [14,3,"14. Competencia","¿Contra qué otros sistemas o productos compite esta idea-proyecto?",1,0],
+   [15,3,"15. Diferencial","Y respecto de la competencia, éste, ¿en qué se diferencia? ¿Cuál es su diferencial?",1,0],
+   [16,4,"16. Descripción de la Idea en detalle","Si el proyecto ya existe, describí lo que ya se hace. Fijate qué hace el ejemplo: no dice sólo QUÉ se quiere lograr, dice CÓMO. Nombra el equipo, la señal, por dónde sale y qué se puede ajustar.",1,0],
+   [17,4,"17. ¿Sobre qué problemas trata tu idea?","",1,0],
+   [18,4,"18. Si tu idea se hiciese realidad ¿quién se beneficiaría más y cómo?","",1,0],
+   [19,4,"19. ¿Cuáles son los primeros pasos para poner en marcha la idea?","Escribí un paso por línea: son el primer borrador del flujo del proyecto (paso 3 de DiDe).",1,0],
+   [20,4,"20. Si tu idea fuese seleccionada y se llevara a la práctica, ¿cuál sería el resultado óptimo y cómo se mediría?","Ojo con esta: pide DOS cosas, el resultado y cómo se mide. No dejes la segunda afuera.",1,0],
+   [21,5,"21. Frase que describe la idea","Una sola línea, la que dirías si alguien te pregunta en el pasillo de qué se trata. El acrónimo y la frase se sostienen entre sí.",1,0],
+   [22,6,"22. ¿Qué presupuesto necesita para llevarse a cabo el primer prototipo funcional?","Fijate que el ejemplo separa lo que YA se tiene de lo que hay que comprar. Hacé lo mismo.",0,0],
+   [23,6,"23. ¿Qué presupuesto se necesita para llevar a cabo un prototipo \"de vuelo\"?","«De vuelo» = la versión robusta, la que ya no es de laboratorio.",0,0],
+   [24,6,"24. ¿Es replicable? ¿Puede producirse en más cantidad?","El ejemplo quedó corto a propósito: un «sí» solo no sirve para documentar nada. Contá con qué se replica y qué haría falta para hacer varios.",1,0],
+   [25,6,"25. ¿Existe demanda local de este producto o servicio?","",1,0],
+   [26,6,"26. ¿Existe demanda internacional de este producto o servicio?","",0,0],
+   [27,6,"27. ¿Crees que se puede montar una empresa para fabricarlo en serie/proveer el servicio?","Si tu respuesta es sí, decí para quién vendería y qué vendería.",0,0],
+   [28,7,"28. ¿De dónde se pueden obtener fondos para el desarrollo del conceptual?","",0,0],
+   [29,7,"29. ¿De dónde se pueden obtener fondos para el desarrollo del prototipo funcional?","",0,0],
+   [30,7,"30. ¿De dónde se pueden obtener fondos para el prototipo \"de vuelo\"?","",0,0],
+   [31,7,"31. ¿De dónde se pueden obtener fondos para la producción en serie?","",0,0],
+   [32,7,"32. Recomendar entidad/entidades para llevarlo a cabo","",0,0]
+  ].map(x=>({n:x[0],b:x[1],t:x[2],a:x[3],req:!!x[4],corta:!!x[5],e:B[x[1]].e}));
+  const SEMA={rojo:"#b3261e",amarillo:"#b58500",verde:"#2e7d32"};
+  // Documento narrativo "Idea-Proyecto" (plantilla CaPI-Universal 01)
+  const SECC=[["1. Identificación",[7,21,2]],["2. La oportunidad (filtros posibilitantes)",[8,9,10,11,12,13]],["3. Posicionamiento",[14,15]],
+    ["4. Descripción del proyecto",[16,17,18,19,20]],["5. Recursos y escalabilidad",[22,23,24,25,26,27]],["6. Financiamiento",[28,29,30,31,32]]];
+
+  const ORIG=JSON.parse(document.getElementById("datos").textContent);
+  let D,KEY,view="responder",cur=0;const EJ=ORIG.personas[0].r;
+  const $=id=>document.getElementById(id);
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  function load(){KEY="dide-concepto-"+(ORIG.doc.codigo||"x");D=clone(ORIG);try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s);}catch(e){}if(!D.personas.length)D.personas.push(nueva(""));}
+  let timer;const save=()=>{clearTimeout(timer);timer=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}},300);};
+  let seq=Date.now();const nueva=nom=>({id:"p"+(seq++).toString(36),nombre:nom,r:{}});
+  const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+  function h(tag,a,txt){const e=document.createElement(tag);if(a)for(const k in a){if(k==="class")e.className=a[k];else e.setAttribute(k,a[k]);}if(txt!=null)e.textContent=txt;return e;}
+  const P=()=>D.personas[cur]||D.personas[0];
+  const val=(p,n)=>String((p.r||{})[n]||"").trim();
+  const titulo=()=>{const a=D.personas.map(p=>val(p,7)).find(Boolean)||D.doc.titulo||"Concepto";return a.split(/[.\n]/)[0].slice(0,90);};
+
+  // ---------------------------------------------------------------- vistas
+  function renderResp(){const box=$("v-resp");box.innerHTML="";const p=P(),fe=$("fl-etapa").value,fv=$("fl-vacias").checked;let lastB=-1;
+    Q.forEach(q=>{if(fe&&q.e!==fe)return;if(fv&&val(p,q.n))return;
+      if(q.b!==lastB){lastB=q.b;box.appendChild(h("div",{"class":"bloque"},B[q.b].t+(q.b===6?" · Etapa II":"")));if(B[q.b].a)box.appendChild(h("p",{"class":"bloque-ayuda"},B[q.b].a));}
+      const d=h("div",{"class":"q",id:"q"+q.n});const l=h("div");const t=h("h3");t.textContent=q.t;if(q.req)t.appendChild(h("span",{"class":"req"}," *"));l.appendChild(t);
+      if(q.a)l.appendChild(h("p",{"class":"hint",style:"margin:0 0 6px;white-space:pre-line"},q.a));
+      const ta=h("textarea",{"aria-label":q.t,"class":q.corta?"corta":""});ta.value=(p.r||{})[q.n]||"";if(q.req&&!ta.value.trim())ta.classList.add("vacia");
+      ta.addEventListener("input",()=>{p.r=p.r||{};p.r[q.n]=ta.value;ta.classList.toggle("vacia",q.req&&!ta.value.trim());if(q.n===1){p.nombre=ta.value.trim();renderSel();}save();renderSide();});
+      l.appendChild(ta);d.appendChild(l);
+      const ej=h("div",{"class":"ej"});const eb=h("b",null,"Ejemplo (SincLE): ");ej.appendChild(eb);ej.appendChild(document.createTextNode(EJ[q.n]||"—"));d.appendChild(ej);box.appendChild(d);});
+    if(!box.children.length)box.appendChild(h("p",{"class":"hint"},"No queda ninguna pregunta por responder con este filtro."));}
+  function renderGrupo(){const box=$("v-grupo");box.innerHTML="";box.appendChild(h("h2",{"class":"bloque"},"Respuestas del grupo ("+D.personas.length+" persona"+(D.personas.length>1?"s":"")+")"));
+    const tb=h("table");const tr=h("tr");tr.appendChild(h("th",null,"Pregunta"));D.personas.forEach(p=>tr.appendChild(h("th",null,p.nombre||"(sin nombre)")));const th=h("thead");th.appendChild(tr);tb.appendChild(th);
+    const body=h("tbody");Q.forEach(q=>{if(q.n<=6&&q.n!==2)return;const r=h("tr");r.appendChild(h("td",null,q.t));D.personas.forEach(p=>{const v=val(p,q.n);r.appendChild(h("td",v?null:{"class":"falta"},v||"—"));});body.appendChild(r);});
+    tb.appendChild(body);box.appendChild(tb);}
+  function narrativa(){ // [{t,items:[{q,quien,texto}]}]
+    const varias=D.personas.length>1;return SECC.map(([t,ns])=>({t,items:[].concat.apply([],ns.map(n=>D.personas.map(p=>({q:Q[n-1],quien:varias?(p.nombre||"(sin nombre)"):"",texto:val(p,n)})).filter(x=>x.texto)))}));}
+  function renderDoc(){const box=$("v-doc");box.innerHTML="";box.appendChild(h("h1",null,"Idea-Proyecto: "+titulo()));
+    box.appendChild(h("p",{"class":"hint"},(D.doc.codigo||"")+" · v"+(D.doc.version||"")+" · "+(D.doc.fecha||"")+" · Elaboró: "+(D.doc.elaboro||"")+" · Respondieron: "+D.personas.map(p=>p.nombre||"(sin nombre)").join(", ")));
+    narrativa().forEach(s=>{box.appendChild(h("h2",null,s.t));if(!s.items.length){box.appendChild(h("p",{"class":"hint"},"Todavía sin respuestas."));return;}
+      let lq=null;s.items.forEach(it=>{if(it.q!==lq){lq=it.q;box.appendChild(h("h3",null,it.q.t.replace(/^\d+\.\s*/,"")));}
+        if(it.quien)box.appendChild(h("p",{"class":"quien"},it.quien));box.appendChild(h("p",null,it.texto));});});}
+  function renderSel(){const s=$("sel-p");s.innerHTML="";D.personas.forEach((p,i)=>s.appendChild(h("option",{value:i},(p.nombre||"(sin nombre)"))));s.value=cur;}
+  function renderSide(){const p=P(),req=Q.filter(q=>q.req),ok=req.filter(q=>val(p,q.n)).length,tot=Q.filter(q=>val(p,q.n)).length;
+    const s=$("sintesis");s.innerHTML="";s.appendChild(h("h2",null,"Avance (se calcula solo)"));
+    const bars=h("div",{"class":"bars"});const b=h("span");b.style.width=(100*ok/req.length)+"%";bars.appendChild(b);s.appendChild(bars);
+    s.appendChild(h("p",null,(p.nombre||"Esta persona")+": "+ok+" de "+req.length+" preguntas obligatorias y "+tot+" de "+Q.length+" en total."));
+    s.appendChild(h("p",null,D.personas.length+" persona(s) en este archivo. Etapa I: "+D.personas.filter(x=>Q.filter(q=>q.e==="I"&&q.req).every(q=>val(x,q.n))).length+" completas · Etapa II: "+D.personas.filter(x=>Q.filter(q=>q.e==="II"&&q.req).every(q=>val(x,q.n))).length+" completas."));
+    const g=$("preguntas");g.innerHTML="";const L=[];
+    req.forEach(q=>{if(!val(p,q.n))L.push({t:"Falta: "+q.t,n:q.n});});
+    const v24=val(p,24);if(v24&&v24.length<15)L.push({t:"La 24 dice sólo «"+v24+"»: contá con qué se replica y qué haría falta para hacer varios.",n:24});
+    const v20=val(p,20);if(v20&&!/medi|compar|indicador|kpi|%|registr/i.test(v20))L.push({t:"La 20 pide dos cosas: ¿cómo se mediría el resultado?",n:20});
+    const v19=val(p,19);if(v19&&v19.split(/\n/).filter(x=>x.trim()).length<3)L.push({t:"La 19: escribí un paso por línea (mejor entre 5 y 10). Son el primer borrador del flujo del proyecto.",n:19});
+    const v21=val(p,21);if(v21&&v21.length>140)L.push({t:"La 21 es larga: la frase tiene que caber en una línea.",n:21});
+    const v7=val(p,7);if(v7&&!/acr[oó]nimo|[A-Z][a-z]*[A-Z]/.test(v7))L.push({t:"La 7 pide un nombre y también un acrónimo.",n:7});
+    g.appendChild(h("h2",null,"Preguntas para revisar ("+L.length+")"));if(!L.length){g.appendChild(h("p",{"class":"hint"},"Nada pendiente para esta persona."));return;}
+    const ol=h("ol");L.forEach(x=>{const li=h("li");const a=h("a",{href:"#q"+x.n},x.t);a.addEventListener("click",ev=>{ev.preventDefault();$("fl-etapa").value="";$("fl-vacias").checked=false;show("responder");renderResp();const el=$("q"+x.n);if(el){el.scrollIntoView({block:"center"});el.querySelector("textarea").focus();}});li.appendChild(a);ol.appendChild(li);});g.appendChild(ol);}
+  function renderHead(){document.querySelectorAll("[data-f]").forEach(e=>{if(document.activeElement!==e)e.value=D.doc[e.dataset.f]||"";});$("h-titulo").textContent="Concepto · "+titulo();
+    $("h-titulo").style.borderLeft="6px solid "+(SEMA[D.doc.semaforo]||SEMA.rojo);$("h-titulo").style.paddingLeft="10px";document.title="Concepto — "+titulo();applyPaper();}
+  function renderTabs(){const n=$("tabs");n.innerHTML="";[["responder","Responder"],["grupo","Respuestas del grupo"],["doc","Documento Idea-Proyecto"]].forEach(([v,t])=>{const b=h("button",{type:"button",role:"tab","aria-selected":String(view===v)},t);b.addEventListener("click",()=>show(v));n.appendChild(b);});
+    $("tools").style.display=view==="responder"?"flex":"none";}
+  function show(v){view=v;document.querySelectorAll(".view").forEach(s=>s.classList.toggle("current",s.dataset.view===v));renderTabs();if(v==="grupo")renderGrupo();if(v==="doc")renderDoc();}
+  function renderAll(){if(cur>=D.personas.length)cur=0;renderSel();renderHead();renderResp();renderSide();show(view);}
+
+  // ---------------------------------------------------------------- impresión
+  const cssStr=s=>'"'+String(s||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/[\r\n]+/g," ")+'"';
+  function applyPaper(){const d=D.doc,box="font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;";
+    $("papel").textContent="@page{size:A4 portrait;margin:10mm 10mm 10mm 20mm;@top-left{content:"+cssStr((d.codigo||"")+" · Concepto DiDe · "+titulo())+";"+box+"}@top-right{content:"+cssStr("Versión "+(d.version||"")+" · "+(d.fecha||""))+";"+box+"}"+
+      "@bottom-left{content:"+cssStr("Elaboró: "+(d.elaboro||"")+" · Semáforo: "+(d.semaforo||""))+";"+box+"}@bottom-right{content:\"Página \" counter(page) \" de \" counter(pages);"+box+"}}";}
+
+  // ---------------------------------------------------------------- CSV (mismas columnas que Google Forms)
+  const csvCell=v=>{v=String(v==null?"":v);return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  function toCSV(){const H=["Marca temporal","Dirección de correo electrónico"].concat(Q.map(q=>q.t));const now=new Date().toISOString().replace("T"," ").slice(0,19);
+    return "\uFEFF"+[H].concat(D.personas.map(p=>[now,val(p,3)].concat(Q.map(q=>val(p,q.n))))).map(r=>r.map(csvCell).join(",")).join("\r\n");}
+  function parseCSV(t){t=t.replace(/^\uFEFF/,"");const first=t.split(/\r?\n/)[0]||"";const sep=(first.split(";").length>first.split(",").length)?";":",";const rows=[];let row=[],cell="",q=false;
+    for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell="";}
+      else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}else cell+=ch;}if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.join("").trim());}
+  function colToQ(hd){const x=norm(hd);const m=x.match(/^(\d{1,2})\s*[.)]/);if(m&&+m[1]>=1&&+m[1]<=32)return +m[1];
+    if(x==="nombre")return 1;if(x.startsWith("tu parte")||x.startsWith("tu etapa"))return 2;if(x.startsWith("direccion de correo"))return 3;return 0;}
+  function importCSV(t,nombreArchivo){const rows=parseCSV(t);if(rows.length<2)throw new Error("El CSV de «"+nombreArchivo+"» no tiene respuestas.");
+    const map=rows[0].map(colToQ);if(!map.some(Boolean))throw new Error("«"+nombreArchivo+"» no tiene columnas de la encuesta de Concepto.");
+    let nuevas=0,act=0;rows.slice(1).forEach(r=>{const res={};map.forEach((n,i)=>{if(n&&String(r[i]||"").trim()&&!(n===3&&res[3]))res[n]=String(r[i]).trim();});
+      const nom=res[1]||"";let p=D.personas.find(x=>nom&&norm(x.nombre)===norm(nom));
+      if(!p){p=D.personas.find(x=>!x.nombre&&!Object.values(x.r||{}).some(v=>String(v).trim()));if(p){p.nombre=nom;}else{p=nueva(nom);D.personas.push(p);}nuevas++;}else act++;
+      p.r=Object.assign(p.r||{},res);if(!p.nombre)p.nombre=nom;});
+    return "«"+nombreArchivo+"»: "+nuevas+" persona(s) nueva(s) y "+act+" completada(s) con esta etapa.";}
+
+  // ---------------------------------------------------------------- DOCX (Word) armado en el navegador, sin bibliotecas
+  const xe=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function wp(text,o){o=o||{};const rpr="<w:rPr>"+(o.b?"<w:b/>":"")+(o.i?"<w:i/>":"")+(o.color?'<w:color w:val="'+o.color+'"/>':"")+'<w:sz w:val="'+(o.sz||22)+'"/></w:rPr>';
+    const runs=String(text).split("\n").map((l,i)=>(i?"<w:r><w:br/></w:r>":"")+'<w:r>'+rpr+'<w:t xml:space="preserve">'+xe(l)+"</w:t></w:r>").join("");
+    const ppr="<w:pPr>"+(o.shade?'<w:shd w:val="clear" w:color="auto" w:fill="'+o.shade+'"/>':"")+(o.border?'<w:pBdr><w:top w:val="single" w:sz="4" w:space="4" w:color="999999"/><w:left w:val="single" w:sz="4" w:space="4" w:color="999999"/><w:bottom w:val="single" w:sz="4" w:space="4" w:color="999999"/><w:right w:val="single" w:sz="4" w:space="4" w:color="999999"/></w:pBdr>':"")+'<w:spacing w:before="'+(o.before||0)+'" w:after="'+(o.after==null?120:o.after)+'"/></w:pPr>';
+    return "<w:p>"+ppr+runs+"</w:p>";}
+  function docxXML(paras){return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+paras.join("")+
+    '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="567" w:right="567" w:bottom="567" w:left="1134" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>';}
+  const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+  function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+  function zip(files){const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+    files.forEach(([name,txt])=>{const n=enc.encode(name),d=enc.encode(txt),c=crc32(d);
+      const lh=new DataView(new ArrayBuffer(30));lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint32(14,c,true);lh.setUint32(18,d.length,true);lh.setUint32(22,d.length,true);lh.setUint16(26,n.length,true);
+      parts.push(new Uint8Array(lh.buffer),n,d);
+      const ch=new DataView(new ArrayBuffer(46));ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint32(16,c,true);ch.setUint32(20,d.length,true);ch.setUint32(24,d.length,true);ch.setUint16(28,n.length,true);ch.setUint32(42,off,true);
+      cen.push(new Uint8Array(ch.buffer),n);off+=30+n.length+d.length;});
+    const csz=cen.reduce((s,x)=>s+x.length,0);const end=new DataView(new ArrayBuffer(22));end.setUint32(0,0x06054b50,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);end.setUint32(12,csz,true);end.setUint32(16,off,true);
+    return new Blob(parts.concat(cen,[new Uint8Array(end.buffer)]),{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});}
+  function docx(paras){return zip([["[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
+    ["_rels/.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    ["word/document.xml",docxXML(paras)]]);}
+  function cabecera(t){const d=D.doc;return [wp("CaPI · DiDe — Paso 1 · Encuesta de Concepto",{sz:18,color:"1F6B62",b:true}),wp(t,{sz:32,b:true,after:60}),
+    wp("Código: "+(d.codigo||"")+" · Versión: "+(d.version||"")+" · Fecha: "+(d.fecha||"")+" · Elaboró: "+(d.elaboro||"")+" · Revisó: "+(d.reviso||"")+" · Semáforo: "+(d.semaforo||""),{sz:18,color:"615D54",after:240})];}
+  function docxCuestionario(){const p=P(),out=cabecera("Concepto · "+(p.nombre||"(sin nombre)"));out.push(wp("Cada pregunta trae un ejemplo resuelto de SincLE, otro proyecto a propósito: muestra cuánto detalle se espera, no qué contestar. Respondé en el recuadro debajo de cada pregunta.",{i:true,sz:20,after:200}));
+    let lb=-1;Q.forEach(q=>{if(q.b!==lb){lb=q.b;out.push(wp(B[q.b].t,{b:true,sz:24,color:"1F6B62",before:240}));if(B[q.b].a)out.push(wp(B[q.b].a,{i:true,sz:19,color:"615D54"}));}
+      out.push(wp(q.t+(q.req?" *":""),{b:true,sz:22,before:160,after:60}));if(q.a)out.push(wp(q.a,{sz:19,color:"615D54",after:60}));
+      out.push(wp("Ejemplo (SincLE): "+(EJ[q.n]||"—"),{sz:19,shade:"E3EFEC",after:80}));out.push(wp(val(p,q.n)||" ",{sz:22,border:true,after:120}));});
+    return docx(out);}
+  function docxDocumento(){const out=cabecera("Idea-Proyecto: "+titulo());out.push(wp("Respondieron: "+D.personas.map(p=>p.nombre||"(sin nombre)").join(", "),{sz:20,after:200}));
+    narrativa().forEach(s=>{out.push(wp(s.t,{b:true,sz:28,color:"1F6B62",before:240}));if(!s.items.length){out.push(wp("Todavía sin respuestas.",{i:true}));return;}
+      let lq=null;s.items.forEach(it=>{if(it.q!==lq){lq=it.q;out.push(wp(it.q.t.replace(/^\d+\.\s*/,""),{b:true,before:120,after:40}));}if(it.quien)out.push(wp(it.quien,{sz:18,b:true,color:"1F6B62",after:20}));out.push(wp(it.texto));});});
+    return docx(out);}
+  function mdDocumento(){let s="# Idea-Proyecto: "+titulo()+"\n\n*"+(D.doc.codigo||"")+" v"+(D.doc.version||"")+" · "+(D.doc.fecha||"")+" · Elaboró: "+(D.doc.elaboro||"")+" · Semáforo: "+(D.doc.semaforo||"")+"*\n\nRespondieron: "+D.personas.map(p=>p.nombre||"(sin nombre)").join(", ")+"\n";
+    narrativa().forEach(x=>{s+="\n## "+x.t+"\n";let lq=null;x.items.forEach(it=>{if(it.q!==lq){lq=it.q;s+="\n### "+it.q.t.replace(/^\d+\.\s*/,"")+"\n";}s+="\n"+(it.quien?"**"+it.quien+":** ":"")+it.texto+"\n";});});
+    return s+"\n---\n*Paso 1 de DiDe — CaPI-Universal · Herramienta Concepto DiDe*\n";}
+
+  // ---------------------------------------------------------------- diálogos y botones
+  const dlg=$("dlg");function msg(t,x,btns){$("dlg-t").textContent=t;$("dlg-b").textContent=x;const f=$("dlg-f");f.innerHTML="";(btns||[["Cerrar","pri",()=>dlg.close()]]).forEach(([l,c,fn])=>{const b=h("button",{type:"button"},l);if(c)b.className=c;b.addEventListener("click",fn);f.appendChild(b);});if(!dlg.open)dlg.showModal();}
+  function download(name,blob){const a=h("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  const slug=()=>((D.doc.codigo||"Concepto")+"").replace(/[^A-Za-z0-9._-]+/g,"_");
+  $("sel-exp").addEventListener("change",function(){const v=this.value;this.value="";if(!v)return;
+    if(v==="csv")download(slug()+"_respuestas.csv",new Blob([toCSV()],{type:"text/csv"}));
+    if(v==="docx")download(slug()+"_"+(P().nombre||"persona").replace(/[^A-Za-z0-9]+/g,"_")+".docx",docxCuestionario());
+    if(v==="docxdoc")download(slug()+"_Idea-Proyecto.docx",docxDocumento());
+    if(v==="md")download(slug()+"_Idea-Proyecto.md",new Blob([mdDocumento()],{type:"text/markdown"}));
+    if(v==="json")download(slug()+".json",new Blob([JSON.stringify(D,null,1)],{type:"application/json"}));});
+  $("f-imp").addEventListener("change",async function(){const files=Array.from(this.files);this.value="";const res=[];
+    for(const f of files){try{const t=await f.text();if(/\.json$/i.test(f.name)){const o=JSON.parse(t);if(!o.doc||!o.personas)throw new Error("«"+f.name+"» no es un JSON de esta herramienta.");D=o;res.push("«"+f.name+"»: datos cargados.");}
+      else res.push(importCSV(t,f.name));}catch(e){res.push(e.message);}}
+    save();cur=0;renderAll();msg("Importación",res.join("\n")+"\n\nSi un grupo respondió las dos etapas en formularios separados, importá los dos CSV: las respuestas se juntan por nombre.");});
+  $("sel-p").addEventListener("change",function(){cur=+this.value;renderAll();});
+  $("b-new").addEventListener("click",()=>{D.personas.push(nueva(""));cur=D.personas.length-1;save();renderAll();$("fl-etapa").value="";const t=document.querySelector("#q1 textarea");if(t)t.focus();});
+  $("b-blank").addEventListener("click",()=>msg("Empezar en blanco","Se borran de este navegador las respuestas actuales (el ejemplo de SincLE sigue a la vista al lado de cada pregunta). Exportá antes si las querés conservar.",
+    [["Cancelar","",()=>dlg.close()],["Empezar en blanco","del",()=>{D={doc:{codigo:"",version:"0.1",fecha:new Date().toISOString().slice(0,10),estado:"Borrador",semaforo:"rojo",titulo:"",elaboro:"",reviso:"—",aprobo:"—",origen:""},personas:[nueva("")]};cur=0;save();dlg.close();renderAll();}]]));
+  $("b-reset").addEventListener("click",()=>msg("Volver a los datos del archivo","Se pierden los cambios guardados en este navegador.",[["Cancelar","",()=>dlg.close()],["Volver","del",()=>{try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);cur=0;dlg.close();renderAll();}]]));
+  $("b-print").addEventListener("click",()=>window.print());
+  ["fl-etapa","fl-vacias"].forEach(id=>$(id).addEventListener("change",renderResp));
+  document.querySelectorAll("[data-f]").forEach(e=>e.addEventListener("input",()=>{D.doc[e.dataset.f]=e.value;save();renderHead();}));
+  document.querySelectorAll("[data-f]").forEach(e=>e.addEventListener("change",()=>{D.doc[e.dataset.f]=e.value;save();renderHead();}));
+  if(location.hash.length>1)view=decodeURIComponent(location.hash.slice(1));
+  load();renderAll();
+})();
+</script>
+</body>
+</html>
