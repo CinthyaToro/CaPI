@@ -14,18 +14,20 @@ Documentar con DiDe sirve para dos cosas:
 desde el primer lote como si fuéramos a calificar. Ver
 [Fabricar no es producir](Guias/CaPI_Recomendacion_Fabricar-Producir-Documentar_v0.md).
 
+**Ver el sitio con las herramientas funcionando:** https://cinthyatoro.github.io/CaPI/ (en github.com los archivos HTML se ven como código).
+
 ## La ruta DiDe
 
 | # | Paso | Pregunta que responde | Material |
 |---|---|---|---|
-| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Herramienta](Herramientas/DiDe_Concepto.html) · [Formularios de Google (script)](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
-| 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Herramienta](Herramientas/DiDe_A3.html) · [Guía](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
-| 3 | Flujo del proyecto | ¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación? | [Herramienta](Herramientas/DiDe_FlujoProyecto.html) |
-| 4 | Ishikawa 6M | ¿Qué hay que controlar para que el resultado se repita? | [Herramienta](Herramientas/DiDe_Ishikawa.html) |
-| 5 | AMFE de proceso y plan de control | ¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla? (Con la WBS, también el AMFE de diseño: una fila por función.) | [Herramienta](Herramientas/DiDe_AMFE.html) |
-| 6 | WBS constructible | ¿Qué hay que hacer en cada parte, y cómo se hace? | [Herramienta](Herramientas/DiDe_WBS.html) · [Guía](Plantillas/CaPI-Universal_03-Guia-WBS-Constructible.md) |
-| 7 | Diccionario de WBS | ¿Cómo se llama cada parte, y qué significa? | [Herramienta](Herramientas/DiDe_WBS.html) · [Plantilla](Plantillas/CaPI-Universal_04-WBS-Dictionary.md) |
-| 8 | BIMi (BIM de investigación) | ¿Qué necesita saber cada persona que lee, y con qué documento se respalda? | [Herramienta](Herramientas/DiDe_BIMi.html) |
+| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_Concepto.html) · [Formularios de Google (script)](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
+| 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_A3.html) · [Guía](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
+| 3 | Flujo del proyecto | ¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_FlujoProyecto.html) |
+| 4 | Ishikawa 6M | ¿Qué hay que controlar para que el resultado se repita? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_Ishikawa.html) |
+| 5 | AMFE de proceso y plan de control | ¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla? (Con la WBS, también el AMFE de diseño: una fila por función.) | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_AMFE.html) |
+| 6 | WBS constructible | ¿Qué hay que hacer en cada parte, y cómo se hace? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_WBS.html) · [Guía](Plantillas/CaPI-Universal_03-Guia-WBS-Constructible.md) |
+| 7 | Diccionario de WBS | ¿Cómo se llama cada parte, y qué significa? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_WBS.html) · [Plantilla](Plantillas/CaPI-Universal_04-WBS-Dictionary.md) |
+| 8 | BIMi (BIM de investigación) | ¿Qué necesita saber cada persona que lee, y con qué documento se respalda? | [Herramienta](https://cinthyatoro.github.io/CaPI/Herramientas/DiDe_BIMi.html) |
 
 ## Qué hay en este repositorio
 

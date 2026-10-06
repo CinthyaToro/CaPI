@@ -22,17 +22,17 @@ La marca **CT** indica lo que agregó la autora de CaPI.
 |---|---|---|
 | 1 | Concepto (encuestas de E, R, F y Q) | [CaPI_Ejercicio-CST_Encuestas-Concepto_v0.md](CaPI_Ejercicio-CST_Encuestas-Concepto_v0.md) |
 | — | Qué dicen las normas ISO, IEC y ECSS sobre fabricar celdas | [CaPI_Ejercicio-CST_Normas-Fabricacion_v0.md](CaPI_Ejercicio-CST_Normas-Fabricacion_v0.md) |
-| 2 | A3 del equipo (v0.1) | [CeSoTe_A3_v0.html](CeSoTe_A3_v0.html) · [PDF](CeSoTe_A3_v0.pdf) |
+| 2 | A3 del equipo (v0.1) | [CeSoTe_A3_v0.html](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_A3_v0.html) · [PDF](CeSoTe_A3_v0.pdf) |
 | 3 | Flujo del proyecto, armado a mano | [CeSoTe_DiagramaProcesos_v0.md](CeSoTe_DiagramaProcesos_v0.md) |
-| — | Lo que aporta una experta (J): Concepto, A3 revisado, sesión con la herramienta | [CeSoTe_Experta_Recorrido-DiDe_v0.md](CeSoTe_Experta_Recorrido-DiDe_v0.md) · [A3 v0.2](CeSoTe_A3_v02.html) |
-| 3 | Flujo del proyecto y ruta de fabricación, en la herramienta | [CeSoTe_FlujoProyecto_v0.html](CeSoTe_FlujoProyecto_v0.html) |
-| 4 | Ishikawa 6M | [CeSoTe_Ishikawa_v0.html](CeSoTe_Ishikawa_v0.html) |
-| 5 | AMFE de proceso y plan de control | [CeSoTe_AMFE-Proceso_v0.md](CeSoTe_AMFE-Proceso_v0.md) · [en la herramienta](CeSoTe_AMFE_v0.html) |
-| 6–7 | WBS y Diccionario | [CeSoTe_WBS_v0.html](CeSoTe_WBS_v0.html) |
-| 8 | BIMi: las cinco preguntas de cada parte, filtradas por quién lee | [CeSoTe_BIMi_v0.html](CeSoTe_BIMi_v0.html) |
+| — | Lo que aporta una experta (J): Concepto, A3 revisado, sesión con la herramienta | [CeSoTe_Experta_Recorrido-DiDe_v0.md](CeSoTe_Experta_Recorrido-DiDe_v0.md) · [A3 v0.2](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_A3_v02.html) |
+| 3 | Flujo del proyecto y ruta de fabricación, en la herramienta | [CeSoTe_FlujoProyecto_v0.html](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_FlujoProyecto_v0.html) |
+| 4 | Ishikawa 6M | [CeSoTe_Ishikawa_v0.html](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_Ishikawa_v0.html) |
+| 5 | AMFE de proceso y plan de control | [CeSoTe_AMFE-Proceso_v0.md](CeSoTe_AMFE-Proceso_v0.md) · [en la herramienta](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_AMFE_v0.html) |
+| 6–7 | WBS y Diccionario | [CeSoTe_WBS_v0.html](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_WBS_v0.html) |
+| 8 | BIMi: las cinco preguntas de cada parte, filtradas por quién lee | [CeSoTe_BIMi_v0.html](https://cinthyatoro.github.io/CaPI/Ejemplos/CeSoTe/CeSoTe_BIMi_v0.html) |
 
 Los archivos `.json` son los datos de cada herramienta: se pueden importar en las herramientas de la carpeta
-[`Herramientas/`](../../Herramientas/).
+[`Herramientas/`](https://cinthyatoro.github.io/CaPI/#t-ruta).
 
 ## Tres ideas que deja el ejemplo
 
