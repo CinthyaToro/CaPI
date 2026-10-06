@@ -412,8 +412,9 @@
   function q(sel){return tx(document.querySelector(sel));}
   function firma(i){var td=document.querySelectorAll('.cover table.t')[1];td=td?td.querySelectorAll('td')[i]:null;
     var f=td?td.querySelectorAll('.f'):[];return {nombre:tx(f[0]),fecha:tx(f[1])};}
+  // Sin carácter escrito, el A3 se trata como confidencial (rojo): nunca se supone que algo es público.
   function semaforo(c){c=c.toLowerCase();if(/confiden|reservad|rojo/.test(c))return 'rojo';if(/grupo|intern|amarill/.test(c))return 'amarillo';
-    if(/p[uú]blic|verde/.test(c))return 'verde';return '';}
+    if(/p[uú]blic|verde/.test(c))return 'verde';return 'rojo';}
   function inl(n){var s='';n.childNodes.forEach(function(c){
     if(c.nodeType===3){s+=c.textContent;return;}if(c.nodeType!==1)return;var t=c.tagName;
     if(t==='BR'){s+='\n';return;}
@@ -492,7 +493,7 @@ document.getElementById('btn-blank').addEventListener('click',function(){
     var th=b.match(/^> \*Para pensar:\* ([\s\S]*)/);if(th)return '<p class="think no-print">'+inl(th[1])+'</p>';
     return '<p>'+inl(b).replace(/\n/g,'<br>')+'</p>';}).join('');}
   function cargarA3(o){var d=o.doc||{};
-    if(!confirm('Se reemplaza este A3 por el del archivo ('+(d.codigo||'sin código')+' v'+(d.version||'?')+'). ¿Seguro?'))return;
+    if(!confirm('Se reemplaza este A3 por el del archivo ('+(d.codigo||'sin código')+' v'+(d.version||'?')+'). Si el que está abierto no lo exportaste, cancelá y usá antes «Exportar .json». ¿Seguro?'))return;
     setF('#f-codigo',d.codigo);setF('#f-version',d.version);setF('#f-fecha',d.fecha);setF('[data-ph="Estado"]',d.estado);
     setF('#f-titulo',d.titulo);setF('[data-ph="Subtítulo"]',d.subtitulo);setF('#f-autor',d.elaboro);setF('#f-etapa',d.proyecto);
     setF('[data-ph="Laboratorio e institución"]',d.institucion);setF('[data-ph="Dirección"]',d.direccion);
@@ -513,15 +514,31 @@ document.getElementById('btn-blank').addEventListener('click',function(){
       return L.map(function(x){return personasDe(x.f.name,x.t);});}).then(function(listas){if(!listas)return;
       var todas={};listas.forEach(function(L){L.forEach(function(p){var k=norm(p.nombre)||('#'+Object.keys(todas).length);todas[k]=todas[k]||{nombre:p.nombre,r:{}};Object.assign(todas[k].r,p.r);});});
       var P=Object.keys(todas).map(function(k){return todas[k];});if(!P.length)return alert('No encontré respuestas.');
-      if(!confirm('Se reemplaza el contenido de las nueve cajas con las respuestas de '+P.length+' persona(s). ¿Seguro?'))return;
+      if(!confirm('Se reemplazan las nueve cajas y la carátula con el Concepto de '+P.length+' persona(s). Si en este navegador había otro A3 sin exportar, cancelá y usá antes «Exportar .json». ¿Seguro?'))return;
       var varias=P.length>1;
       Object.keys(MAPA).forEach(function(cls){var b=document.querySelector('.cell.'+cls+' .body');if(!b)return;var html='';
         MAPA[cls].forEach(function(n){P.forEach(function(p){var v=String(p.r[n]||'').trim();if(!v)return;
           html+='<p><b>[P'+n+(varias&&p.nombre?' · '+esc(p.nombre):'')+']</b> '+esc(v).replace(/\n/g,'<br>')+'</p>';});});
         b.innerHTML=html;});
-      var nom=String((P.find(function(p){return p.r[7];})||{r:{}}).r[7]||'').split(/[.\n]/)[0];
-      var ti=document.getElementById('f-titulo');if(ti&&nom)ti.textContent='A3 — '+nom;
-      var au=document.getElementById('f-autor');if(au)au.textContent=P.map(function(p){return p.nombre;}).filter(Boolean).join(', ');
+      // Carátula nueva (06/10/2026): no queda nada del ejemplo. Código y título salen del acrónimo de la P7.
+      var p7=String((P.find(function(p){return p.r[7];})||{r:{}}).r[7]||''),r=function(n){return String((P.find(function(p){return p.r[n];})||{r:{}}).r[n]||'').trim();};
+      var acr=(p7.match(/acr[oó]nimo\s*:?\s*([^\s.,;:]+)/i)||p7.match(/\b([A-Za-zÁÉÍÓÚÑáéíóúñ]*[a-z][A-Z][A-Za-z0-9]*)\b/)||[])[1]||'';
+      var nom=p7.split(/[:.\n]/)[0].trim();if(nom.length>60)nom=nom.slice(0,60).replace(/\s+\S*$/,'')+'…';
+      var hoy=new Date().toISOString().slice(0,10),quien=P.map(function(p){return p.nombre;}).filter(Boolean).join(', ');
+      var set=function(sel,v){var e=document.querySelector(sel);if(e)e.textContent=v;};
+      set('#f-titulo','A3 — '+(acr&&nom&&nom!==acr?acr+' · '+nom:(acr||nom||'Proyecto')));
+      set('#f-codigo',(acr||'PROYECTO')+'-A3');set('#f-version','0.1');set('#f-fecha',hoy);set('[data-ph="Estado"]','Borrador');
+      set('[data-ph="Subtítulo"]',r(21));set('#f-autor',quien);set('#f-etapa',acr||nom);
+      set('[data-ph="Laboratorio e institución"]','');set('[data-ph="Dirección"]',[r(4),r(5),r(6)].filter(Boolean).join(', '));
+      set('[data-ph="Carácter"]','');set('[data-ph="Contenido"]','Hoja 2: lienzo A3 de nueve cajas prellenado desde el Concepto. Falta destilarlo en reunión.');
+      set('.cover .box .note','Origen: Concepto de '+(acr||nom)+' ('+P.length+' persona(s)), importado el '+hoy+'.');
+      set('.a3-title .badge','Borrador');
+      var tds=(document.querySelectorAll('.cover table.t')[1]||document).querySelectorAll('td');
+      [1,2].forEach(function(i){if(tds[i])tds[i].querySelectorAll('.f').forEach(function(f){f.textContent='';});});
+      var hist=Array.prototype.slice.call(document.querySelectorAll('.cover table.t')).pop();
+      Array.prototype.slice.call(hist.querySelectorAll('tr')).slice(1).forEach(function(tr,i){var c=tr.querySelectorAll('.f');
+        if(i===0){c[0].textContent='0.1';c[2].textContent='Prellenado desde el Concepto';c[3].textContent=quien;}
+        else c.forEach(function(f){f.textContent='';});});
       var b0=document.querySelector('.body');if(b0)b0.dispatchEvent(new Event('input',{bubbles:true}));
       alert('Listo: las nueve cajas quedaron prellenadas. Cada texto dice de qué pregunta sale ([P8] = pregunta 8). Ahora toca destilar: una caja no debería pasar de cinco líneas.');
     }).catch(function(e){alert('No se pudo importar: '+e.message);});});

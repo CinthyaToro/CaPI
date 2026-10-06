@@ -9,16 +9,19 @@
   Un solo archivo, sin dependencias. Para usarla con otro proyecto:
     1. Copiá este archivo y reemplazá el bloque <script id="datos" type="application/json"> por tus datos, o
     2. abrilo y usá "Importar" con un .json (mismo formato) o un .csv (columnas abajo).
+  Desde el 06/10/2026 "Importar" también acepta el .json de la herramienta Flujo del proyecto: toma su control
+  documental y su lista de pasos, para indicar en cada causa el paso donde actúa (después lo usa el AMFE).
 
   FORMATO JSON
   {
     "doc":   { "codigo","version","fecha","estado","semaforo" ("rojo"|"amarillo"|"verde"),
                "titulo","pregunta","efecto","objetivo","elaboro","reviso","aprobo","autores" },
+    "pasos": [ { "id","acr","texto" } ]                         (opcional: del flujo importado)
     "causas":[ { "id","m" (Método|Máquina|Materiales|Medición|Mano de obra|Medio ambiente),
                  "texto","autor","estado" (controlada|variable|no_dominada|sin_evaluar),
-                 "nota","medicion" } ]
+                 "paso" (id de un paso, opcional),"nota","medicion" } ]
   }
-  CSV: id;m;texto;autor;estado;nota;medicion   (separador ; — una causa por fila)
+  CSV: id;m;texto;autor;estado;paso;nota;medicion   (separador ; — una causa por fila)
 -->
 <style>
   /* Espina de pescado alimentada por datos: el color de cada nodo es su estado; la síntesis se calcula sola. */
@@ -198,7 +201,7 @@
 
   <div class="below">
     <div class="box" id="sintesis"></div>
-    <div class="box"><h2>Causas</h2><table><thead><tr><th>M</th><th>Causa</th><th>Autor</th><th>Estado</th><th>Nota / evidencia</th><th>Cómo se mide</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    <div class="box"><h2>Causas</h2><table><thead><tr><th>M</th><th>Causa</th><th>Autor</th><th>Estado</th><th>Paso</th><th>Nota / evidencia</th><th>Cómo se mide</th></tr></thead><tbody id="tbody"></tbody></table></div>
   </div>
 
   <footer class="run foot"><span>Elaboró: <span data-f="elaboro"></span> · <span data-f="fecha"></span></span><span class="foot-sema"></span><span>Portada</span></footer>
@@ -386,11 +389,14 @@
     t.style.left=Math.min(ev.clientX-r.left+14,r.width-310)+'px';t.style.top=(ev.clientY-r.top+14)+'px';
   }
 
+  // Paso del flujo o de la ruta de fabricación donde actúa la causa (06/10/2026, pedido de J en CeSoTe): es lo que
+  // después une la causa con una fila del AMFE. Si se importó un flujo, se elige de su lista de pasos.
+  function pasoTxt(id){if(!id)return '';var p=(D.pasos||[]).find(function(x){return x.id===id||x.acr===id;});return p?(p.acr||p.id):id;}
   function renderTable(){
     var tb=$('tbody');tb.innerHTML='';
     MS.forEach(function(m){D.causas.filter(function(c){return c.m===m;}).forEach(function(c){
       var tr=document.createElement('tr');if(!visible(c))tr.className='dim';
-      [m,c.texto,c.autor||'',null,c.nota||'',c.medicion||''].forEach(function(v,i){
+      [m,c.texto,c.autor||'',null,pasoTxt(c.paso),c.nota||'',c.medicion||''].forEach(function(v,i){
         var td=document.createElement('td');
         if(i===3){var d=document.createElement('span');d.className='dot d-'+c.estado;td.appendChild(d);td.appendChild(document.createTextNode(EST[c.estado].t));}
         else td.textContent=v;
@@ -450,12 +456,12 @@
 
   function openDlg(c){
     var isNew=!c, edit=document.body.classList.contains('edit')||isNew;
-    if(isNew)c={id:'c'+Date.now(),m:MS[0],texto:'',autor:'',estado:'sin_evaluar',nota:'',medicion:''};
+    if(isNew)c={id:'c'+Date.now(),m:MS[0],texto:'',autor:'',estado:'sin_evaluar',paso:'',nota:'',medicion:''};
     $('dlg-t').textContent=isNew?'Nueva causa':c.texto;
     var b=$('dlg-b'),f=$('dlg-f');b.innerHTML='';f.innerHTML='';
     if(!edit){
       b.className='dlg-b ro';
-      [['M',c.m],['Estado',EST[c.estado].t],['Aportó',c.autor||'—'],['Nota / evidencia',c.nota||'—'],['Cómo se mide',c.medicion||'—']].forEach(function(r){
+      [['M',c.m],['Estado',EST[c.estado].t],['Aportó',c.autor||'—'],['Paso',pasoTxt(c.paso)||'—'],['Nota / evidencia',c.nota||'—'],['Cómo se mide',c.medicion||'—']].forEach(function(r){
         var d=document.createElement('div');d.innerHTML='<span class="k"></span><p></p>';d.firstChild.textContent=r[0];d.lastChild.textContent=r[1];b.appendChild(d);});
       addBtn(f,'Cerrar','pri',function(){$('dlg').close();});
     }else{
@@ -469,6 +475,8 @@
       field('Causa','texto','text');
       field('Aportó (inicial o nombre)','autor','text');
       field('Estado','estado','select',Object.keys(EST).map(function(k){return[k,EST[k].t];}));
+      if((D.pasos||[]).length)field('Paso del flujo o de la ruta donde actúa','paso','select',[['','— (ninguno o todos)']].concat(D.pasos.map(function(p){return[p.id,(p.acr?p.acr+' · ':'')+p.texto];})));
+      else field('Paso donde actúa (acrónimo o número; importá el flujo para elegirlo de una lista)','paso','text');
       field('Nota / evidencia','nota','area');
       field('Cómo se mide','medicion','area');
       if(!isNew)addBtn(f,'Borrar','del',function(){D.causas=D.causas.filter(function(x){return x.id!==c.id;});save();$('dlg').close();renderAll();});
@@ -513,7 +521,7 @@
   // exportar / importar
   function slug(){return (D.doc.codigo||'ishikawa').replace(/[^A-Za-z0-9._-]+/g,'_');}
   function download(name,text,type){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
-  var COLS=['id','m','texto','autor','estado','nota','medicion'];
+  var COLS=['id','m','texto','autor','estado','paso','nota','medicion'];
   function csvCell(v){v=String(v==null?'':v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
   $('b-json').addEventListener('click',function(){download(slug()+'.json',JSON.stringify(D,null,2),'application/json');});
   $('b-csv').addEventListener('click',function(){
@@ -531,12 +539,31 @@
     return rows.filter(function(r){return r.join('').trim();}).map(function(r,j){var o={};h.forEach(function(k,i){o[k]=(r[i]||'').trim();});
       if(!o.id)o.id='c'+(j+1);if(!EST[o.estado])o.estado='sin_evaluar';return o;});
   }
+  // Importar el flujo del proyecto (06/10/2026): toma su control documental y la lista de pasos (elementos con acrónimo
+  // y pasos de las rutas de fabricación). El efecto suele salir de la rama NO de una revisión: se listan para elegir.
+  function desdeFlujo(o,ejemplo){var f=o.doc||{},acr=f.acronimo||String(f.codigo||'').split('-')[0]||'PROYECTO',hoy=new Date().toISOString().slice(0,10);
+    var pasos=[];(o.nodos||[]).forEach(function(n){if(n.acr&&['decision','revision','terminal','enlace'].indexOf(n.tipo)<0)pasos.push({id:n.id,acr:n.acr,texto:n.texto});});
+    (o.rutas||[]).forEach(function(r){(r.pasos||[]).forEach(function(p){pasos.push({id:p.id,acr:p.acr||'',texto:(r.id?r.id+' · ':'')+p.texto});});});
+    var rev=(o.nodos||[]).filter(function(n){return n.tipo==='revision';});
+    D={doc:{codigo:acr+'-ISH-01',version:'0.1',fecha:hoy,estado:'Borrador desde el flujo',semaforo:f.semaforo||'rojo',titulo:f.titulo||acr,
+        pregunta:'',efecto:'',objetivo:'',elaboro:f.elaboro||'',reviso:'—',aprobo:'—',autores:f.autores||''},
+      pasos:pasos,causas:ejemplo?[]:D.causas};
+    return 'Se tomó la carátula de «'+(f.codigo||acr)+'» (semáforo '+D.doc.semaforo+') y '+pasos.length+' pasos para unir cada causa con su paso.'+
+      (ejemplo?' Se sacaron las causas del ejemplo.':'')+(rev.length?'\n\nEl efecto suele salir de la rama NO de una revisión:\n'+rev.map(function(n){return '· '+n.texto+' → NO: '+(n.no||'?');}).join('\n'):'')+
+      '\n\nEscribí el efecto y la pregunta en la carátula (botón Editar).';}
   $('f-imp').addEventListener('change',function(){
     var file=this.files[0];if(!file)return;var rd=new FileReader();
     rd.onload=function(){try{
+      var ejemplo=D.doc.codigo===ORIG.doc.codigo||JSON.stringify(D.causas)===JSON.stringify(ORIG.causas),aviso='';
       if(/\.csv$/i.test(file.name)){D.causas=parseCSV(rd.result);}
-      else{var o=JSON.parse(rd.result);if(!o.doc||!o.causas)throw new Error('Faltan "doc" o "causas"');D=o;}
+      else{var o=JSON.parse(rd.result);
+        if(o.nodos&&o.etapas){aviso=desdeFlujo(o,ejemplo);}  // JSON de la herramienta Flujo del proyecto
+        else{if(!o.doc||!o.causas)throw new Error('Faltan "doc" o "causas" (o "nodos" y "etapas", si es un flujo)');
+          // Este navegador guarda un solo Ishikawa: avisar antes de reemplazar otro proyecto que no sea el ejemplo.
+          if(!ejemplo&&D.doc.codigo&&D.doc.codigo!==o.doc.codigo&&!confirm('En este navegador está abierto «'+D.doc.codigo+'». Si no lo exportaste, cancelá y exportá su JSON antes. ¿Reemplazarlo por «'+(o.doc.codigo||file.name)+'»?'))return;
+          if(!o.doc.semaforo)o.doc.semaforo='rojo';D=o;}}
       save();sel=null;renderAll();
+      if(aviso){$('dlg-t').textContent='Flujo importado';$('dlg-b').className='dlg-b';$('dlg-b').textContent=aviso;$('dlg-f').innerHTML='';addBtn($('dlg-f'),'Cerrar','pri',function(){$('dlg').close();});$('dlg').showModal();}
     }catch(e){$('dlg-t').textContent='No se pudo importar';$('dlg-b').className='dlg-b';$('dlg-b').textContent='Revisá el formato del archivo: '+e.message;$('dlg-f').innerHTML='';addBtn($('dlg-f'),'Cerrar','pri',function(){$('dlg').close();});$('dlg').showModal();}};
     rd.readAsText(file,'utf-8');this.value='';});
   $('b-print').addEventListener('click',function(){document.body.classList.remove('only-diagram');window.print();});

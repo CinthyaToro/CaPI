@@ -410,8 +410,9 @@
   function q(sel){return tx(document.querySelector(sel));}
   function firma(i){var td=document.querySelectorAll('.cover table.t')[1];td=td?td.querySelectorAll('td')[i]:null;
     var f=td?td.querySelectorAll('.f'):[];return {nombre:tx(f[0]),fecha:tx(f[1])};}
+  // Sin carácter escrito, el A3 se trata como confidencial (rojo): nunca se supone que algo es público.
   function semaforo(c){c=c.toLowerCase();if(/confiden|reservad|rojo/.test(c))return 'rojo';if(/grupo|intern|amarill/.test(c))return 'amarillo';
-    if(/p[uú]blic|verde/.test(c))return 'verde';return '';}
+    if(/p[uú]blic|verde/.test(c))return 'verde';return 'rojo';}
   function inl(n){var s='';n.childNodes.forEach(function(c){
     if(c.nodeType===3){s+=c.textContent;return;}if(c.nodeType!==1)return;var t=c.tagName;
     if(t==='BR'){s+='\n';return;}

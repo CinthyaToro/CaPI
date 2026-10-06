@@ -449,7 +449,8 @@
     words.forEach((w,wi)=>{const c=w.split("").filter(ch=>/[a-z]/.test(ch)&&!VOC.has(ch));
       if(c.length>=3){cands.push(c[0]+c[1]+c[2]);for(let i=3;i<c.length;i++){cands.push(c[0]+c[1]+c[i]);cands.push(c[0]+c[2]+c[i]);}}
       if(wi===0&&words[1]){const c2=words[1].split("").filter(ch=>/[a-z]/.test(ch)&&!VOC.has(ch));if(c.length&&c2.length>=2)cands.push(c[0]+c2[0]+c2[1]);}});
-    for(const c of cands){const a=(prefix?prefix+".":"")+c;if(!used.has(a))return{acr:a,forzado:false};}
+    // Un tramo igual al nombre de una etapa (pln, drq, mpl, vld, pmv) confunde: «pmv.mfn.drq» parece de requisitos.
+    for(const c of cands){if(D.etapas.some(e=>e.id===c))continue;const a=(prefix?prefix+".":"")+c;if(!used.has(a))return{acr:a,forzado:false};}
     const base=(words.join("").replace(/[^a-z]/g,"")+"xxx").slice(0,3);let a=(prefix?prefix+".":"")+base,i=2;
     while(used.has(a)){a=(prefix?prefix+".":"")+base.slice(0,2)+i;i++;}
     return{acr:a,forzado:true};}
@@ -467,15 +468,23 @@
   // ------------------------------------------------------------------ reglas: clasificador por palabras clave
   const R_CAL=/calibr|metrolog|metodo de medicion|metodos de medicion|trazabil|patron/;
   const R_VLD=/valid|ensay|certific|calific|verific|medir|medicion|caracteriz|prueba|probar|testear|degradac|en campo|ciclo de vida|monitore/;
-  const R_PLN=/estudi|mercado|defin|elegi|eleccion|planific|presupuest|financ|linea base|patente|libertad de operacion|busqueda|trl|cronograma|relev/;
+  const R_PLN=/estudi|mercado|defin|elegi|eleccion|planific|presupuest|financ|linea base|patente|libertad de operacion|busqueda|trl|cronograma|relev|decision de arquitectura|\badr\b/;
   const R_DRQ=/especific|requisit|norma|permiso|inventari|seguridad|criterio|arbol de documentos/;
   const R_PMV=/manual|informe|entreg|acuerdo|pmv|transfer|licenc|publica/;
-  const R_MPL=/fabric|armar|arma |constru|implement|instal|montar|disen|program|lote|proceso|texturiz|difusi|deposit|serigraf|coccion|evapor|limpi|ruta|hoja de ruta|identific|integr|formar|formacion|tratamiento/;
+  const R_MPL=/fabric|armar|arma |constru|implement|instal|montar|disen|program|lote|proceso|texturiz|difusi|deposit|serigraf|coccion|evapor|limpi|ruta|hoja de ruta|identific|integr|formar|formacion|tratamiento|migr|despleg|repositorio|modulo|firmware|software|contenedor|docker/;
   const R_DOC=/manual|informe|documento|\bpid\b|plan de|acuerdo|declaracion|amfe|fmea/;
   function ctlTipo(t){if(R_CAL.test(t))return"calibracion";if(/valid/.test(t))return"validacion";if(/certific|calific|ensay|degradac/.test(t))return"calificacion";return"verificacion";}
+  // El verbo con que empieza el paso pesa más que las palabras sueltas: «Montar … un módulo de prueba» es
+  // implementación aunque diga «prueba» (hallazgo de una prueba de la cadena, 06/10/2026).
+  const V_MPL=/^(montar|armar|construir|fabricar|implementar|instalar|migrar|integrar|programar|desplegar|soldar|imprimir|cablear|cargar)\b/;
+  const V_VLD=/^(validar|verificar|medir|probar|ensayar|caracterizar|calificar|inspeccionar|comparar)\b/;
+  const V_PLN=/^(definir|elegir|fijar|estudiar|registrar|presupuestar|buscar|planificar|revisar|relevar)\b/;
   function classify(texto){
-    const t=norm(texto);let etapa=null,control=null;
+    const t=norm(texto);let etapa=null,control=null;const v=t.replace(/^[^a-z]+/,"");
     if(R_CAL.test(t)){etapa="mpl";control="calibracion";}
+    else if(V_VLD.test(v)){etapa="vld";control=ctlTipo(t);}
+    else if(V_MPL.test(v))etapa="mpl";
+    else if(V_PLN.test(v))etapa="pln";
     else if(R_VLD.test(t)){etapa="vld";control=ctlTipo(t);}
     else if(R_PLN.test(t))etapa="pln";
     else if(R_DRQ.test(t))etapa="drq";
@@ -808,7 +817,7 @@
       else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}
       else cell+=ch;}
     if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.join("").trim());}
-  function iniciales(s){const w=strip(s).split(/\s+/).filter(Boolean);if(!w.length)return"";if(w.length===1)return w[0];return w.slice(0,3).map(x=>x[0].toUpperCase()).join("");}
+  function iniciales(s){const w=strip(s).replace(/\(.*?\)/g," ").replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\s]/g," ").split(/\s+/).filter(Boolean);if(!w.length)return"";if(w.length===1)return w[0];return w.slice(0,3).map(x=>x[0].toUpperCase()).join("");}
   function pasosDe(txt){let L=String(txt||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
     if(L.length<=1)L=String(txt||"").split(/(?:^|\s)\d{1,2}\s*[.)-]\s+|;/).map(s=>s.trim()).filter(Boolean);
     return L.map(s=>s.replace(/^[-*•·\d.)\s]+/,"").trim()).filter(s=>s.length>2);}
@@ -826,7 +835,10 @@
       const think=l.match(/^>\s*\*Para pensar:\*\s*(.*)/);if(think){items[box].push({think:true,t:strip(think[1])});return;}
       if(/^>/.test(l))return;items[box].push({t:strip(l.replace(/^\s*[-*]\s+/,""))});});
     const out=[];const add=(etapa,tipo,t,extra)=>out.push(Object.assign({id:uid("n"),etapa,padre:"",tipo,texto:short(t,100),nota:t.length>100?t:"",origen:"A3 "+extra.box,control:null},extra.o||{}));
-    const pend=(t,box,etapa)=>{const m=t.match(/\[(?:a definir|a confirmar|a verificar)[:;]?\s*([^\]]*)\]/i);if(m)add(etapa,"decision","¿"+(m[1]||"Se confirma")+"?",{box,o:{si:"",no:""}});};
+    // «[a definir]» sin texto: la pregunta toma lo que dice la línea justo antes (no un «¿Se confirma?» sin contexto).
+    const pend=(t,box,etapa)=>{const m=t.match(/\[(?:a definir|a confirmar|a verificar)[:;]?\s*([^\]]*)\]/i);if(!m)return;
+      const ctx=t.slice(0,m.index).replace(/[`*]/g,"").split(/[;:]/).pop().trim().replace(/[.,]$/,"");
+      add(etapa,"decision","¿"+(m[1].trim()||(ctx?ctx.charAt(0).toUpperCase()+ctx.slice(1):"Se confirma"))+"?",{box,o:{si:"",no:""}});};
     const ET={1:"pln",2:"drq",3:"pln",4:"mpl",5:"pmv",6:"pmv",7:"pln",8:"vld",9:"drq"};
     Object.keys(items).forEach(k=>{const bx=+k,et=ET[bx];if(!et)return;
       const its=items[bx].filter(x=>x.t&&!/:\s*$/.test(x.t));
@@ -834,26 +846,42 @@
       its.forEach(x=>{
         if(x.think){const q=x.t.match(/¿[^?]*\?/g);add(et,"decision",q?q[q.length-1]:short(x.t,90),{box:bx,o:{nota:x.t}});return;}
         if(bx===3){add("pln","decision","¿Los beneficiarios valoran esto: «"+short(x.t,70)+"»?",{box:3,o:{si:"Seguir",no:"Revisar la caja 3 del A3",nota:x.t}});return;}
-        const clean=x.t.replace(/\[[^\]]*\]/g,"").trim();
+        const clean=x.t.replace(/`?\[[^\]]*\]`?/g,"").replace(/\s+([.,;:])/g,"$1").trim();
         if(clean.replace(/[^A-Za-zÀ-ÿ]/g,"").length<4||/:\s*$/.test(clean)){pend(x.t,bx,et);return;}  // sólo quedó una etiqueta
         if(bx===8){add("vld","proceso",clean,{box:8,o:{control:{tipo:ctlTipo(norm(clean)),que:short(clean,100),referencia:"",criterio:"",reaccion:"",resultado:""}}});}
         else add(et,(bx===2||bx===9||bx===1||bx===5||bx===6)?(R_DOC.test(norm(clean))?"documento":"datos"):"proceso",clean,{box:bx});
         pend(x.t,bx,et);});});
     return out;}
+  // Control documental de un diagrama nuevo: sale del A3 (título, carácter → semáforo) y del Concepto (acrónimo, quiénes
+  // respondieron). Nada se hereda del ejemplo. Sin carácter escrito, el semáforo es rojo.
+  function docDesde(c,a){const hoy=new Date().toISOString().slice(0,10);let titulo="",car="",obj="",acr="",quien="";
+    if(a){titulo=((a.match(/^#\s*(.+)$/m)||[])[1]||"").replace(/^A3\s*[—-]\s*/,"").trim();car=((a.match(/\*\*Car[aá]cter:\*\*\s*(.+)$/m)||[])[1]||"").trim();
+      const c3=a.split(/^##\s*3\s*·.*$/m)[1];if(c3)obj=strip(c3.split(/^##\s/m)[0].split(/\n/).map(s=>s.trim()).filter(s=>s&&!/^\*[^*].*\*$/.test(s))[0]||"");}
+    if(c){const rows=parseCSV(c),hd=rows[0]||[],i7=hd.findIndex(x=>/^\s*7\s*[.)]/.test(x)),inm=hd.findIndex(x=>/^\s*1\s*[.)]|^nombre$/i.test(x.trim()));
+      const p7=rows.slice(1).map(r=>r[i7]||"").find(Boolean)||"";acr=((p7.match(/acr[oó]nimo\s*:?\s*([^\s.,;:]+)/i)||p7.match(/\b([A-Za-zÁÉÍÓÚÑáéíóúñ]*[a-z][A-Z][A-Za-z0-9]*)\b/)||[])[1]||"");
+      quien=inm>=0?rows.slice(1).map(r=>(r[inm]||"").trim()).filter(Boolean).join(", "):"";if(!titulo)titulo=p7.split(/[:.\n]/)[0].trim();}
+    if(!acr)acr=(titulo.match(/^([^\s·—-]+)/)||[])[1]||"PROYECTO";
+    const k=norm(car),sem=/confiden|reservad|rojo/.test(k)?"rojo":/grupo|intern|amarill/.test(k)?"amarillo":/public|verde/.test(k)?"verde":"rojo";
+    return{codigo:acr+"-FP-01",version:"0.1",fecha:hoy,estado:"Borrador desde el Concepto y el A3",semaforo:sem,titulo:titulo||acr,objetivo:obj,
+      acronimo:acr,fase:"",trl:"",elaboro:quien,reviso:"—",aprobo:"—",autores:quien,origen:"Esqueleto armado por reglas desde el Concepto y el A3 ("+hoy+")."};}
   function readFile(inp){return new Promise((res,rej)=>{const f=inp.files&&inp.files[0];if(!f)return res(null);const rd=new FileReader();rd.onload=()=>res(rd.result);rd.onerror=rej;rd.readAsText(f,"utf-8");});}
   function openEsqueleto(){const b=dlgOpen("Esqueleto desde Concepto y A3");
     b.appendChild(h("p",{style:"margin:0"},"La herramienta arma un borrador con reglas fijas, sin IA y sin enviar datos afuera: ubica cada caja del A3 en su etapa y cada paso de la pregunta 16 del Concepto según palabras clave, marca los controles, convierte las preguntas abiertas en decisiones y propone acrónimos. Después pregunta lo que no puede decidir."));
     const l1=h("label",null,"Concepto: respuestas de Google Forms (.csv)");const i1=h("input",{type:"file",accept:".csv"});l1.appendChild(i1);b.appendChild(l1);
     const l2=h("label",null,"A3 (.md: «Exportar .md» de la herramienta A3)");const i2=h("input",{type:"file",accept:".md,.txt"});l2.appendChild(i2);b.appendChild(l2);
-    const fM=field(b,"Qué hacer con el diagrama actual","agregar","select",[["agregar","Agregar al diagrama actual"],["nuevo","Empezar uno nuevo (conserva el control documental y las etapas)"]]);
+    const fM=field(b,"Qué hacer con el diagrama actual","nuevo","select",[["nuevo","Empezar uno nuevo, con carátula nueva desde el Concepto y el A3"],["agregar","Agregar al diagrama actual"]]);
     btn("Cancelar","",()=>dlg.close());
     btn("Generar","pri",async()=>{try{const [c,a]=await Promise.all([readFile(i1),readFile(i2)]);if(!c&&!a){i1.focus();return;}
         let nuevos=[];if(c)nuevos=nuevos.concat(fromConcepto(c));if(a)nuevos=nuevos.concat(fromA3(a));
-        if(fM.value==="nuevo"){D.nodos=[];D.rutas=[];}
+        // Sobre el ejemplo nunca se agrega: se empieza uno nuevo (si no, el proyecto queda mezclado con SincLE).
+        const ejemplo=(D.doc.codigo===ORIG.doc.codigo||JSON.stringify(D.nodos)===JSON.stringify(ORIG.nodos)),nuevo=fM.value==="nuevo"||ejemplo;
+        if(nuevo){D.nodos=[];D.rutas=[];D.doc=docDesde(c,a);D.etapas=[];}
         ["pln","drq","mpl","vld","pmv"].forEach((id,i)=>{if(!D.etapas.some(e=>e.id===id))D.etapas.splice(i,0,{id,nombre:["Planificación","Determinación de requisitos","Implementación","Validación","PMV"][i]});});
         D.nodos=D.nodos.concat(nuevos);fillAcr(false);save();renderAll();
         const sin=nuevos.filter(n=>n.sinEtapa).length,ck=nuevos.filter(n=>n.control).length,dec=nuevos.filter(n=>n.tipo==="decision").length;
-        msg("Esqueleto generado","Se agregaron "+nuevos.length+" elementos: "+ck+" con control, "+dec+" decisiones y "+sin+" sin etapa clara.\nRevisá la lista de preguntas: ahí están las dudas que la herramienta no puede resolver sola, incluidos los pasos que parecen repetidos.");
+        msg("Esqueleto generado",(ejemplo&&fM.value!=="nuevo"?"El diagrama abierto era el ejemplo de SincLE: se empezó uno nuevo para no mezclarlos.\n":"")+
+          (nuevo?"Carátula nueva: "+D.doc.codigo+", semáforo "+D.doc.semaforo+". Revisala arriba, en la carátula.\n":"")+
+          "Se agregaron "+nuevos.length+" elementos: "+ck+" con control, "+dec+" decisiones y "+sin+" sin etapa clara.\nRevisá la lista de preguntas: ahí están las dudas que la herramienta no puede resolver sola, incluidos los pasos que parecen repetidos.");
       }catch(e){msg("No se pudo generar",e.message);}});}
 
   // ------------------------------------------------------------------ exportar e importar
@@ -885,7 +913,11 @@
         D.nodos=rows.map((r,j)=>{const o={};hd.forEach((k,i)=>o[k]=(r[i]||"").trim());
           const n={id:o.id||"n"+(j+1),etapa:o.etapa,padre:o.padre,tipo:o.tipo,texto:o.texto,acr:o.acr,origen:o.origen,nota:o.nota,si:o.si,no:o.no,ruta:o.ruta,control:null};
           if(o.ctipo)n.control={tipo:o.ctipo,que:o.que,referencia:o.referencia,criterio:o.criterio,reaccion:o.reaccion,resultado:o.resultado};return n;});}
-      else{const o=JSON.parse(rd.result);if(!o.doc||!o.etapas||!o.nodos)throw new Error('Faltan "doc", "etapas" o "nodos".');D=o;}
+      else{const o=JSON.parse(rd.result);if(!o.doc||!o.etapas||!o.nodos)throw new Error('Faltan "doc", "etapas" o "nodos".');
+        // Este navegador guarda un solo flujo: avisar antes de reemplazar otro proyecto que no sea el ejemplo.
+        const ejemplo=(D.doc.codigo===ORIG.doc.codigo||JSON.stringify(D.nodos)===JSON.stringify(ORIG.nodos));
+        if(!ejemplo&&D.doc.codigo&&D.doc.codigo!==o.doc.codigo&&!confirm("En este navegador está abierto «"+D.doc.codigo+"». Si no lo exportaste, cancelá y exportá su JSON antes. ¿Reemplazarlo por «"+(o.doc.codigo||file.name)+"»?"))return;
+        if(!o.doc.semaforo)o.doc.semaforo="rojo";D=o;}
       normalize();save();view="proyecto";renderAll();
     }catch(e){msg("No se pudo importar","Revisá el formato del archivo: "+e.message);}};
     rd.readAsText(file,"utf-8");this.value="";});

@@ -19,13 +19,16 @@
     - .json de esta herramienta;
     - .json de la herramienta Flujo del proyecto: toma los pasos y los controles de una ruta de fabricación;
     - .json de la herramienta Ishikawa: toma las causas, para unirlas a las filas y ver cuáles faltan;
-    - .csv "AMFE de proceso, esqueleto" exportado por la herramienta Flujo del proyecto.
+    - .csv "AMFE de proceso, esqueleto" exportado por la herramienta Flujo del proyecto;
+    - .json de la herramienta WBS (06/10/2026): arma un AMFE DE DISEÑO, con una fila por función (globitos terminales
+      y críticos) y el plan de verificación tomado del V-Model de los críticos (doc.tipo = "diseno").
+  Si lo abierto es el ejemplo de SincLE, al importar un flujo o una WBS se arma una carátula nueva y se sacan sus filas.
 
   FORMATO JSON
   { "doc":   { codigo, version, fecha, estado, semaforo, titulo, alcance, elaboro, reviso, aprobo, autores, origen,
-               umbralNPR, umbralS, plan (prototipo|prelanzamiento|produccion) },
+               umbralNPR, umbralS, plan (prototipo|prelanzamiento|produccion), tipo (proceso|diseno) },
     "pasos": [ { id, texto, acr } ],
-    "causas":[ { id, m, texto, estado } ],                      (del Ishikawa; opcional)
+    "causas":[ { id, m, texto, estado, paso } ],                (del Ishikawa; opcional)
     "filas": [ { id, paso, modo, efecto, s, causa, causaRef: [ids], o, prevencion, deteccion, d,
                  accion, responsable, plazo, estadoAccion (abierta|en_curso|cerrada), s2, o2, d2, origen } ],
     "plan":  [ { id, paso, caracteristica, tipo (calibracion|verificacion|validacion|calificacion), metodo,
@@ -1052,6 +1055,19 @@
   const CTL={calibracion:"Calibración",verificacion:"Verificación",validacion:"Validación",calificacion:"Calificación"};
   const EST={abierta:"Abierta",en_curso:"En curso",cerrada:"Cerrada"};
   const PLAN={prototipo:"de prototipo",prelanzamiento:"de prelanzamiento",produccion:"de producción"};
+  // AMFE de diseño (06/10/2026, decisión de la autora): mismas columnas, pero cada fila es una función (un globito de la
+  // WBS) en lugar de un paso de fabricación, y el plan es de verificación del diseño. Se activa al importar una WBS.
+  const DIS=()=>D.doc.tipo==="diseno";
+  const T=()=>DIS()?{amfe:"AMFE de diseño",plan:"Plan de verificación",paso:"Función (globito)",kicker:"DiDe — AMFE de diseño y plan de verificación"}
+                   :{amfe:"AMFE de proceso",plan:"Plan de control",paso:"Paso",kicker:"DiDe — AMFE de proceso y plan de control"};
+  function renderTipo(){const t=T();const k=document.querySelector(".kicker");if(k)k.textContent=t.kicker;
+    ["t-amfe","t-plan"].forEach(id=>{const tb=$(id),th=tb&&tb.parentNode.querySelector("thead th");if(th)th.textContent=t.paso;});
+    const a=document.querySelector('section[data-view="amfe"] h2'),ra=document.querySelector('section[data-view="amfe"] .rotulo');if(a)a.textContent=t.amfe;if(ra)ra.dataset.rot=t.amfe;
+    const p=document.querySelector('section[data-view="plan"] h2'),rp=document.querySelector('section[data-view="plan"] .rotulo');if(p&&p.firstChild)p.firstChild.textContent=t.plan+" · ";if(rp)rp.dataset.rot=t.plan;}
+  // ¿Lo abierto es todavía el ejemplo de SincLE? Entonces nada de él se conserva al importar un proyecto.
+  // (Se compara el código: normalize() reescribe las filas al cargarlas y una comparación del texto nunca coincide.)
+  const esEjemplo=()=>D.doc.codigo===ORIG.doc.codigo||JSON.stringify(D.filas)===JSON.stringify(ORIG.filas);
+  const hoy=()=>new Date().toISOString().slice(0,10);
   const SEMA={rojo:{h:"#b3261e",d:"Sólo autores y capacitadora."},amarillo:{h:"#b58500",d:"Todo el grupo."},verde:{h:"#2e7d32",d:"Público."}};
   const ORIG=JSON.parse(document.getElementById("datos").textContent);
   let D,KEY,view="amfe",celda=null;
@@ -1117,8 +1133,10 @@
 
   // ---------------------------------------------------------------- preguntas y síntesis
   function preguntas(){const Q=[],u=D.doc.umbralNPR;const fn=f=>"«"+trunc(f.modo||"(sin modo)",50)+"» ("+trunc(pasoTxt(f.paso),30)+")";
-    D.causas.forEach(c=>{if(!D.filas.some(f=>f.causaRef.includes(c.id)))Q.push({t:"La causa «"+c.texto+"» ("+(c.m||"")+") del Ishikawa no está en ninguna fila: ¿en qué paso actúa, o es un requisito que falta?"});});
-    D.pasos.forEach(p=>{if(!D.filas.some(f=>f.paso===p.id))Q.push({t:"¿Qué puede fallar en el paso «"+p.texto+"»?",p:p.id});});
+    D.causas.forEach(c=>{if(D.filas.some(f=>f.causaRef.includes(c.id)))return;const ps=c.paso&&pasoDe(c.paso);
+      Q.push(ps?{t:"La causa «"+c.texto+"» del Ishikawa actúa en «"+trunc(ps.texto,50)+"» y no está en ninguna fila: ¿qué modo de falla produce?",p:ps.id}
+        :{t:"La causa «"+c.texto+"» ("+(c.m||"")+") del Ishikawa no está en ninguna fila: ¿en qué "+(DIS()?"función":"paso")+" actúa?"+(DIS()?"":" Si es del diseño del sistema y no de un paso, va en un AMFE de diseño (importá la WBS).")});});
+    D.pasos.forEach(p=>{if(!D.filas.some(f=>f.paso===p.id))Q.push({t:"¿Qué puede fallar en "+(DIS()?"la función":"el paso")+" «"+p.texto+"»?",p:p.id});});
     D.filas.forEach(f=>{const r={f:f.id};
       if(!f.modo||!f.efecto)Q.push({t:fn(f)+": falta el modo de falla o el efecto.",r});
       if(!f.causa&&!f.causaRef.length)Q.push({t:fn(f)+": ¿por qué fallaría? Falta la causa.",r});
@@ -1129,7 +1147,7 @@
       if(+f.o>=7&&!f.prevencion)Q.push({t:fn(f)+": la causa ocurre seguido y no hay prevención: ¿qué la evitaría?",r});
       if(+f.d>=7)Q.push({t:fn(f)+": se detecta tarde o no se detecta: ¿qué control la detectaría antes?",r});
       if(npr2(f)!==""&&+npr2(f)>=+npr(f))Q.push({t:fn(f)+": después de la acción el riesgo no bajó.",r});});
-    D.pasos.forEach(p=>{if(!D.plan.some(k=>k.paso===p.id))Q.push({t:"El paso «"+p.texto+"» no tiene ninguna característica en el plan de control.",p:p.id});});
+    if(!DIS())D.pasos.forEach(p=>{if(!D.plan.some(k=>k.paso===p.id))Q.push({t:"El paso «"+p.texto+"» no tiene ninguna característica en el plan de control.",p:p.id});});
     D.plan.forEach(k=>{const r={k:k.id};const nm="Plan · «"+trunc(k.caracteristica||"(sin característica)",40)+"»";
       if(!k.metodo)Q.push({t:nm+": ¿con qué método y contra qué referencia se mide?",r});
       if(!k.criterio)Q.push({t:nm+": ¿cuál es el criterio de aceptación?",r});
@@ -1157,10 +1175,10 @@
   function renderRotulos(){document.querySelectorAll("[data-rot]").forEach(r=>{r.innerHTML="";r.appendChild($("tpl-rot").content.cloneNode(true));r.querySelector(".rot-diag").textContent=r.dataset.rot;});}
   function renderFilters(){const f=$("fl-paso"),v=f.value;f.innerHTML='<option value="">todos</option>';D.pasos.forEach((p,i)=>f.appendChild(h("option",{value:p.id},(i+1)+" · "+trunc(p.texto,40))));f.value=D.pasos.some(p=>p.id===v)?v:"";
     $("fl-celda").textContent=celda?"Casilla S "+celda[0]+" · O "+celda[1]+" ":"";if(celda){const b=h("button",{type:"button"},"quitar");b.addEventListener("click",()=>{celda=null;renderAll();});$("fl-celda").appendChild(b);}}
-  function renderTabs(){const nav=$("tabs");nav.innerHTML="";[["amfe","AMFE"],["acciones","Acciones"],["matriz","Matriz S × O"],["plan","Plan de control"]].forEach(([v,t])=>{
+  function renderTabs(){const nav=$("tabs");nav.innerHTML="";[["amfe","AMFE"],["acciones","Acciones"],["matriz","Matriz S × O"],["plan",T().plan]].forEach(([v,t])=>{
     const b=h("button",{type:"button",role:"tab","aria-selected":String(view===v)},t);b.addEventListener("click",()=>show(v));nav.appendChild(b);});}
   function show(v){view=v;document.querySelectorAll(".view").forEach(s=>s.classList.toggle("current",s.dataset.view===view));renderTabs();}
-  function renderAll(){normalize();renderRotulos();renderFilters();renderAMFE();renderAcc();renderMatriz();renderPlan();renderPreguntas();renderSintesis();renderDoc();show(view);bindDocFields();}
+  function renderAll(){normalize();renderTipo();renderRotulos();renderFilters();renderAMFE();renderAcc();renderMatriz();renderPlan();renderPreguntas();renderSintesis();renderDoc();show(view);bindDocFields();}
 
   // ---------------------------------------------------------------- diálogos
   const dlg=$("dlg");
@@ -1185,7 +1203,7 @@
       btn("Editar","",()=>{setEdit(true);openFila(f);});btn("Cerrar","pri",()=>dlg.close());return;}
     f=f||{id:uid("f"),paso:$("fl-paso").value||(D.pasos[0]||{}).id||"",modo:"",efecto:"",s:"",causa:"",causaRef:[],o:"",prevencion:"",deteccion:"",d:"",accion:"",responsable:"",plazo:"",estadoAccion:"",s2:"",o2:"",d2:"",origen:""};
     const b=dlgOpen(isNew?"Nueva fila del AMFE":"Editar fila");
-    const fP=field(b,"Paso",f.paso,"select",D.pasos.map((p,i)=>[p.id,(i+1)+" · "+p.texto]));
+    const fP=field(b,T().paso,f.paso,"select",D.pasos.map((p,i)=>[p.id,(i+1)+" · "+p.texto]));
     const fM=field(b,"Modo de falla (qué puede salir mal)",f.modo,"area");const fE=field(b,"Efecto (qué le pasa a la pieza o al dato)",f.efecto,"area");
     const fC=field(b,"Causa (por qué saldría mal)",f.causa,"area");
     let cks=[];if(D.causas.length){const l=h("label",null,"Causas del Ishikawa");const box=h("div",{"class":"causas-ck"});
@@ -1216,7 +1234,7 @@
       btn("Editar","",()=>{setEdit(true);openPlan(k);});btn("Cerrar","pri",()=>dlg.close());return;}
     k=k||{id:uid("k"),paso:(D.pasos[0]||{}).id||"",caracteristica:"",tipo:"verificacion",metodo:"",criterio:"",frecuencia:D.doc.plan==="prototipo"?"Cada pieza":"",registro:"Hoja de ruta del lote",reaccion:"",responsable:""};
     const b=dlgOpen(isNew?"Nueva fila del plan de control":"Editar plan de control");
-    const fP=field(b,"Paso",k.paso,"select",D.pasos.map((p,i)=>[p.id,(i+1)+" · "+p.texto]));const fC=field(b,"Característica",k.caracteristica);
+    const fP=field(b,T().paso,k.paso,"select",D.pasos.map((p,i)=>[p.id,(i+1)+" · "+p.texto]));const fC=field(b,"Característica",k.caracteristica);
     const fT=field(b,"Tipo de control",k.tipo,"select",Object.keys(CTL).map(x=>[x,CTL[x]]));const fM=field(b,"Método y referencia",k.metodo,"area");
     const r=h("div",{"class":"row2"});b.appendChild(r);const fCr=field(r,"Criterio de aceptación",k.criterio),fF=field(r,"Tamaño y frecuencia de muestra",k.frecuencia);
     const r2=h("div",{"class":"row2"});b.appendChild(r2);const fR=field(r2,"Registro",k.registro),fRs=field(r2,"Responsable",k.responsable);const fRe=field(b,"Plan de reacción",k.reaccion,"area");
@@ -1240,14 +1258,33 @@
       else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}else cell+=ch;}
     if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.join("").trim());}
   function fromFlujo(o){const R=o.rutas||[];if(!R.length)throw new Error("El flujo no tiene rutas de fabricación.");
-    const go=r=>{D.pasos=r.pasos.map(p=>({id:p.id,texto:p.texto,acr:p.acr||""}));
+    const go=r=>{const ej=esEjemplo(),f=o.doc||{},acr=f.acronimo||String(f.codigo||"").split("-")[0]||"PROYECTO";
+      // Sobre el ejemplo: carátula nueva desde el flujo y sin las filas ni las causas de SincLE.
+      if(ej){D.filas=[];D.causas=[];D.doc={codigo:acr+"-AMFE-01",version:"0.1",fecha:hoy(),estado:"Borrador desde el flujo",semaforo:f.semaforo||"rojo",
+        titulo:(f.titulo||acr)+" · "+r.nombre,alcance:"Ruta "+r.id+" · "+r.nombre,elaboro:f.elaboro||"",reviso:"—",aprobo:"—",autores:f.autores||"",
+        origen:"Pasos y controles del flujo "+(f.codigo||"")+" ("+hoy()+").",umbralNPR:150,umbralS:9,plan:"prototipo",tipo:"proceso"};}
+      D.doc.tipo="proceso";
+      D.pasos=r.pasos.map(p=>({id:p.id,texto:p.texto,acr:p.acr||""}));
       D.plan=r.pasos.filter(p=>p.control).map(p=>({id:uid("k"),paso:p.id,caracteristica:p.control.que||"",tipo:p.control.tipo||"verificacion",metodo:p.control.referencia||"",criterio:p.control.criterio||"",
         frecuencia:r.escala==="laboratorio"?"Cada pieza":"",registro:"Hoja de ruta del lote",reaccion:p.control.reaccion||"",responsable:""}));
       D.filas.forEach(f=>{if(!D.pasos.some(p=>p.id===f.paso)){const m=D.pasos.find(p=>norm(p.texto)===norm(pasoTxt(f.paso).replace(/^\d+ · /,"")));if(m)f.paso=m.id;}});
       if(!D.doc.alcance)D.doc.alcance="Ruta "+r.id+" · "+r.nombre;D.doc.plan=r.escala==="laboratorio"?"prototipo":D.doc.plan;
-      save();dlg.close();renderAll();msg("Pasos importados","Se tomaron "+D.pasos.length+" pasos y "+D.plan.length+" filas del plan de control de la ruta "+r.id+". Ahora falta lo que la ruta no sabe: qué puede fallar en cada paso, por qué y con qué gravedad.");};
+      save();dlg.close();renderAll();msg("Pasos importados",(ej?"Lo abierto era el ejemplo de SincLE: se sacaron sus filas y la carátula nueva es "+D.doc.codigo+" (semáforo "+D.doc.semaforo+").\n\n":"")+
+        "Se tomaron "+D.pasos.length+" pasos y "+D.plan.length+" filas del plan de control de la ruta "+r.id+". Ahora falta lo que la ruta no sabe: qué puede fallar en cada paso, por qué y con qué gravedad.");};
     if(R.length===1)return go(R[0]);const b=dlgOpen("¿Qué ruta?");const f=field(b,"Ruta de fabricación",R[0].id,"select",R.map(r=>[r.id,r.id+" · "+r.nombre]));btn("Cancelar","",()=>dlg.close());btn("Importar","pri",()=>go(R.find(r=>r.id===f.value)));}
-  function fromIshikawa(o){D.causas=o.causas.map(c=>({id:c.id,m:c.m,texto:c.texto,estado:c.estado}));save();renderAll();
+  // Funciones de la WBS → AMFE de diseño: globitos terminales y críticos (sin documentos); el plan de verificación sale
+  // del V-Model de los críticos.
+  function fromWBS(o){const N=o.nodos||[],kids=id=>N.filter(n=>n.padre===id),ej=esEjemplo(),f=o.doc||{},acr=f.acronimo||String(f.codigo||"").split("-")[0]||"PROYECTO";
+    if(!ej&&!DIS()&&D.filas.length&&!confirm("Se arma un AMFE de diseño nuevo y se reemplaza el AMFE de proceso abierto («"+(D.doc.codigo||"")+"»). Si no lo exportaste, cancelá y exportá su JSON antes. ¿Seguir?"))return;
+    if(ej||!DIS()){D.filas=[];if(ej)D.causas=[];D.doc={codigo:acr+"-AMFED-01",version:"0.1",fecha:hoy(),estado:"Borrador desde la WBS",semaforo:f.semaforo||"rojo",
+      titulo:(f.titulo||acr)+" · diseño",alcance:"Funciones de la WBS "+(f.codigo||"")+": globitos terminales y críticos",elaboro:f.elaboro||"",reviso:"—",aprobo:"—",
+      autores:f.autores||"",origen:"WBS "+(f.codigo||"")+" ("+hoy()+").",umbralNPR:150,umbralS:9,plan:"prototipo",tipo:"diseno"};}
+    D.pasos=N.filter(n=>n.padre&&n.tipo!=="documento"&&(n.critico||!kids(n.id).length)).map(n=>({id:n.id,texto:n.nombre+(n.que?" — "+n.que:""),acr:n.acr||""}));
+    D.plan=N.filter(n=>n.critico&&n.vmodel&&(n.vmodel.criterio||n.vmodel.test)).map(n=>({id:uid("k"),paso:n.id,caracteristica:n.vmodel.kpi||n.que||"",tipo:"verificacion",
+      metodo:n.vmodel.test||"",criterio:n.vmodel.criterio||"",frecuencia:"Cada versión del diseño",registro:"Informe de verificación",reaccion:"",responsable:""}));
+    D.filas=D.filas.filter(x=>D.pasos.some(p=>p.id===x.paso));save();renderAll();
+    msg("Funciones importadas","AMFE de diseño: se tomaron "+D.pasos.length+" funciones de la WBS (globitos terminales y críticos) y "+D.plan.length+" filas del plan de verificación (V-Model de los críticos).\n\nEn cada función, preguntá qué puede fallar en el diseño, por qué y con qué gravedad. Las causas del Ishikawa que no son de un paso de fabricación van acá.");}
+  function fromIshikawa(o){D.causas=o.causas.map(c=>({id:c.id,m:c.m,texto:c.texto,estado:c.estado,paso:c.paso||""}));save();renderAll();
     msg("Causas importadas","Se tomaron "+D.causas.length+" causas del Ishikawa «"+((o.doc&&o.doc.titulo)||"")+"». Al editar una fila podés marcar a qué causas responde; la lista de preguntas muestra las que todavía no están en ninguna fila.");}
   function fromCSV(t){const rows=parseCSV(t);const hd=rows.shift().map(x=>norm(x));const ix=k=>hd.findIndex(x=>x.includes(k));
     if(ix("modo de falla")<0)throw new Error("No encontré la columna «Modo de falla».");const ip=ix("paso"),ia=ix("acronimo"),idt=ix("deteccion");
@@ -1256,10 +1293,14 @@
     save();renderAll();msg("Esqueleto importado","Ahora hay "+D.pasos.length+" pasos. Las filas nuevas tienen el control actual del paso; falta el modo de falla, el efecto, la causa y los puntajes.");}
   $("f-imp").addEventListener("change",function(){const file=this.files[0];if(!file)return;const rd=new FileReader();
     rd.onload=()=>{try{if(/\.csv$/i.test(file.name))return fromCSV(rd.result);const o=JSON.parse(rd.result);
-      if(o.filas&&o.pasos){D=o;normalize();save();renderAll();return;}
-      if(o.rutas&&o.nodos)return fromFlujo(o);
+      if(o.filas&&o.pasos){
+        // Este navegador guarda un solo AMFE: avisar antes de reemplazar otro proyecto que no sea el ejemplo.
+        if(!esEjemplo()&&D.doc.codigo&&D.doc.codigo!==(o.doc||{}).codigo&&!confirm("En este navegador está abierto «"+D.doc.codigo+"». Si no lo exportaste, cancelá y exportá su JSON antes. ¿Reemplazarlo por «"+((o.doc||{}).codigo||file.name)+"»?"))return;
+        D=o;if(!D.doc.semaforo)D.doc.semaforo="rojo";normalize();save();renderAll();return;}
+      if(o.rutas&&o.nodos&&o.etapas)return fromFlujo(o);
+      if(o.nodos&&!o.etapas&&o.nodos.some(n=>"que" in n))return fromWBS(o);
       if(o.causas&&o.doc&&("efecto" in o.doc))return fromIshikawa(o);
-      throw new Error("No reconozco el archivo: no es un AMFE, ni un flujo del proyecto, ni un Ishikawa.");}
+      throw new Error("No reconozco el archivo: no es un AMFE, ni un flujo del proyecto, ni un Ishikawa, ni una WBS.");}
       catch(e){msg("No se pudo importar","Revisá el archivo: "+e.message);}};rd.readAsText(file,"utf-8");this.value="";});
   function download(name,text,type){const a=h("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
   const csvCell=v=>{v=String(v==null?"":v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
@@ -1274,13 +1315,13 @@
     if(v==="json")download(slug()+".json",JSON.stringify(D,null,1),"application/json");
     if(v==="amfe")download(slug()+"_AMFE.csv",csv([AMFE_H].concat(D.filas.map(amfeRow))),"text/csv");
     if(v==="plan")download(slug()+"_Plan-de-control.csv",csv([PLAN_H].concat(D.plan.map(planRow))),"text/csv");
-    if(v==="md")download(slug()+".md","# "+(D.doc.titulo||"AMFE")+"\n\n*"+(D.doc.codigo||"")+" v"+(D.doc.version||"")+" · "+(D.doc.fecha||"")+" · Elaboró: "+(D.doc.elaboro||"")+" · Semáforo: "+(D.doc.semaforo||"")+"*\n\nAlcance: "+(D.doc.alcance||"")+". Umbral: NPR ≥ "+D.doc.umbralNPR+" o S ≥ "+D.doc.umbralS+".\n\n## AMFE de proceso\n\n"+md(AMFE_H,D.filas.map(amfeRow))+"\n## Plan de control "+PLAN[D.doc.plan]+"\n\n"+md(PLAN_H,D.plan.map(planRow)),"text/markdown");});
+    if(v==="md")download(slug()+".md","# "+(D.doc.titulo||"AMFE")+"\n\n*"+(D.doc.codigo||"")+" v"+(D.doc.version||"")+" · "+(D.doc.fecha||"")+" · Elaboró: "+(D.doc.elaboro||"")+" · Semáforo: "+(D.doc.semaforo||"")+"*\n\nAlcance: "+(D.doc.alcance||"")+". Umbral: NPR ≥ "+D.doc.umbralNPR+" o S ≥ "+D.doc.umbralS+".\n\n## "+T().amfe+"\n\n"+md([T().paso].concat(AMFE_H.slice(1)),D.filas.map(amfeRow))+"\n## "+T().plan+" "+PLAN[D.doc.plan]+"\n\n"+md(PLAN_H,D.plan.map(planRow)),"text/markdown");});
 
   // ---------------------------------------------------------------- impresión y edición del documento
   const PAPEL={A4:[297,210],A3:[420,297]};
   function applyPaper(){const d=D.doc,s=SEMA[d.semaforo]||SEMA.rojo,box="font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;";
     $("papel").textContent="@page{size:"+pref.papel+" landscape;margin:10mm 10mm 10mm 20mm;"+
-      "@top-left{content:"+cssStr((d.codigo||"")+" · AMFE de proceso DiDe · "+(d.titulo||""))+";"+box+"}"+
+      "@top-left{content:"+cssStr((d.codigo||"")+" · "+T().amfe+" DiDe · "+(d.titulo||""))+";"+box+"}"+
       "@top-right{content:"+cssStr("Versión "+(d.version||"")+" · "+(d.fecha||""))+";"+box+"}"+
       "@bottom-left{content:"+cssStr("Elaboró: "+(d.elaboro||"")+" · Semáforo: "+(d.semaforo||"")+" — "+s.d)+";"+box+"}"+
       "@bottom-right{content:\"Página \" counter(page) \" de \" counter(pages);"+box+"}}";$("sel-papel").value=pref.papel;}

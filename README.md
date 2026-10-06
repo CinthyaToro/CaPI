@@ -22,7 +22,7 @@ desde el primer lote como si fuéramos a calificar. Ver
 | 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Herramienta](Herramientas/DiDe_A3.html) · [Guía](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
 | 3 | Flujo del proyecto | ¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación? | [Herramienta](Herramientas/DiDe_FlujoProyecto.html) |
 | 4 | Ishikawa 6M | ¿Qué hay que controlar para que el resultado se repita? | [Herramienta](Herramientas/DiDe_Ishikawa.html) |
-| 5 | AMFE de proceso y plan de control | ¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla? | [Herramienta](Herramientas/DiDe_AMFE.html) |
+| 5 | AMFE de proceso y plan de control | ¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla? (Con la WBS, también el AMFE de diseño: una fila por función.) | [Herramienta](Herramientas/DiDe_AMFE.html) |
 | 6 | WBS constructible | ¿Qué hay que hacer en cada parte, y cómo se hace? | [Herramienta](Herramientas/DiDe_WBS.html) · [Guía](Plantillas/CaPI-Universal_03-Guia-WBS-Constructible.md) |
 | 7 | Diccionario de WBS | ¿Cómo se llama cada parte, y qué significa? | [Herramienta](Herramientas/DiDe_WBS.html) · [Plantilla](Plantillas/CaPI-Universal_04-WBS-Dictionary.md) |
 | 8 | BIM tecnológico | ¿Qué documentación necesita cada tipo de usuario? | Próximamente |
@@ -49,7 +49,7 @@ pueda copiar la respuesta.
    «Exportar .md» lo deja listo para el paso siguiente («Exportar .json» sirve para volver a abrirlo).
 3. Abrí la herramienta de flujo del proyecto. Con "Esqueleto desde Concepto y A3" arma un primer borrador por reglas,
    sin IA y sin enviar datos afuera; después pregunta lo que no puede decidir.
-4. Seguí con el Ishikawa, el AMFE, la WBS y el Diccionario. Cada herramienta importa lo que exportó la anterior.
+4. Seguí con el Ishikawa, el AMFE, la WBS y el Diccionario. Cada herramienta importa lo que exportó la anterior; si lo abierto es el ejemplo, arma una carátula nueva y no lo mezcla con tu proyecto.
 
 Lo que produce cada grupo es **suyo y confidencial**: no lo subas a un repositorio público hasta saber qué partes
 conviene proteger. Las herramientas guardan los datos sólo en tu navegador.

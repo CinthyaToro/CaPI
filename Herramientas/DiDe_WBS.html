@@ -306,7 +306,9 @@
       if(n.descomponible==="si"&&!kids(n.id).length)Q.push({t:nm+" se puede descomponer, pero todavía no tiene hijos.",r});
       if(n.descomponible==="no"&&kids(n.id).length)Q.push({t:nm+" está marcado como terminal pero tiene hijos.",r});
       if(n.descomponible==="no"&&(String(n.como).length>260||items(n.como).length>5))Q.push({t:nm+" es terminal pero su CÓMO es largo: ¿un técnico puede ejecutarlo con un SOP? Si no, descomponelo.",r});
-      if(R_IF.test(" "+n.como+" "))Q.push({t:nm+": el CÓMO tiene un «si…». Los IF no van en la WBS: llevalo al flujo del proyecto como decisión, o dejalo dentro del CÓMO si es un reintento normal.",r});
+      // «saber si», «y si», «verificar si»… son un *si* de pregunta (whether), no un condicional: no cuentan.
+      if(n.descomponible!=="si"&&/\bfase\s*[2-9]\b/i.test(n.nombre))Q.push({t:nm+" habla de otra fase: ¿va en la WBS de esta fase o queda afuera?",r});
+      if(R_IF.test(" "+String(n.como).replace(/\b(y|o|saber|ver|verificar|decidir|indicar|determinar|comprobar|evaluar|definir|preguntar)\s+si\b/gi,"")+" "))Q.push({t:nm+": el CÓMO tiene un «si…». Los IF no van en la WBS: llevalo al flujo del proyecto como decisión, o dejalo dentro del CÓMO si es un reintento normal.",r});
       if(!acrValido(n))Q.push({t:nm+": el acrónimo no sigue la convención α (tres letras, con el prefijo del padre).",r});
       if(acrs[n.acr]>1)Q.push({t:nm+": el acrónimo está repetido.",r});
       if(n.critico&&!(n.idef0.entradas||n.idef0.salidas||n.idef0.controles||n.idef0.mecanismos))Q.push({t:nm+" es crítico: completá su ficha IDEF0 (entradas, salidas, controles, mecanismos).",r});
@@ -417,14 +419,20 @@
 
   // ---------------------------------------------------------------- importar
   const SIN=new Set(["decision","revision","terminal"]);
-  function fromFlujo(o){const d=o.doc||{};const nodos=[];const root={id:"root",acr:d.acronimo||"PRY",padre:"",nombre:d.titulo||"",que:d.objetivo||"",como:"",descomponible:"si",tipo:"proceso",origen:"Flujo del proyecto"};nodos.push(root);
+  // Hallazgos de una prueba de la cadena (06/10/2026): un paso con ✔ es un proceso con su V-Model, salvo que el paso SEA la
+  // medición; lo que tiene un control de seguridad es crítico aunque sea público.
+  const ES_MED=/^(validar|verificar|medir|probar|ensayar|caracterizar|calificar|inspeccionar|calibrar|comparar|recibir e inspeccionar|recepcion e inspeccion|prueba|ensayo|inspeccion|medicion|calibracion|caracterizacion|validacion|verificacion)\b/;
+  const ES_SEG=/segurid|interlock|60825|riesgo electric|proteccion de personas/;
+  function avisoOtro(cod){const ej=D.doc.codigo===ORIG.doc.codigo;return ej||!D.doc.codigo||D.doc.codigo===cod||confirm("En este navegador está abierta la WBS «"+D.doc.codigo+"». Si no la exportaste, cancelá y exportá su JSON antes. ¿Reemplazarla por «"+(cod||"la nueva")+"»?");}
+  function fromFlujo(o){const d=o.doc||{};if(!avisoOtro((d.codigo||"").replace(/-FP-/,"-WBS-")))return;const nodos=[];const root={id:"root",acr:d.acronimo||"PRY",padre:"",nombre:d.titulo||"",que:d.objetivo||"",como:"",descomponible:"si",tipo:"proceso",origen:"Flujo del proyecto"};nodos.push(root);
     (o.etapas||[]).forEach(e=>nodos.push({id:"e-"+e.id,acr:e.id,padre:"root",nombre:e.nombre,que:"",como:"",descomponible:"si",tipo:"proceso",origen:"Flujo del proyecto"}));
-    const tipo=n=>n.control?"validacion":n.tipo==="datos"?"entrada":n.tipo==="documento"?"documento":"proceso";
+    const tipo=n=>n.control&&ES_MED.test(norm(n.texto))?"validacion":n.tipo==="datos"?"entrada":n.tipo==="documento"?"documento":"proceso";
+    const seg=p=>ES_SEG.test(norm(p.texto+" "+(p.control?(p.control.que||"")+" "+(p.control.referencia||""):"")));
     const ok=new Set((o.nodos||[]).filter(n=>!SIN.has(n.tipo)).map(n=>n.id));
     (o.nodos||[]).forEach(n=>{if(SIN.has(n.tipo))return;const padre=n.padre&&ok.has(n.padre)?n.padre:"e-"+n.etapa;
       if(n.tipo==="enlace"){const r=(o.rutas||[]).find(x=>x.id===n.ruta);if(!r)return;
-        nodos.push({id:"ruta-"+r.id,acr:r.acr||"",padre,nombre:"Ruta de fabricación: "+r.nombre,que:"",como:r.pasos.map(p=>p.texto).join(" → "),descomponible:"si",tipo:"proceso",origen:n.origen||""});
-        r.pasos.forEach(p=>nodos.push({id:p.id,acr:p.acr||"",padre:"ruta-"+r.id,nombre:p.texto,que:"",como:"",descomponible:"no",tipo:p.control?"validacion":"proceso",pi:p.pi||"sin_definir",critico:p.pi==="patente"||p.pi==="secreto",
+        nodos.push({id:"ruta-"+r.id,acr:r.acr||"",padre,nombre:/^ruta\b/i.test(r.nombre||"")?r.nombre:"Ruta de fabricación: "+r.nombre,que:"",como:r.pasos.map(p=>p.texto).join(" → "),descomponible:"si",tipo:"proceso",origen:n.origen||""});
+        r.pasos.forEach(p=>nodos.push({id:p.id,acr:p.acr||"",padre:"ruta-"+r.id,nombre:p.texto,que:"",como:"",descomponible:"no",tipo:p.control&&ES_MED.test(norm(p.texto))?"validacion":"proceso",pi:p.pi||"sin_definir",critico:p.pi==="patente"||p.pi==="secreto"||seg(p),
           vmodel:p.control?{criterio:p.control.criterio||"",kpi:p.control.que||"",test:p.control.referencia||""}:{},origen:p.origen||""}));return;}
       nodos.push({id:n.id,acr:n.acr||"",padre,nombre:n.texto,que:"",como:"",descomponible:"",tipo:tipo(n),vmodel:n.control?{criterio:n.control.criterio||"",kpi:n.control.que||"",test:n.control.referencia||""}:{},origen:n.origen||""});});
     nodos.forEach(n=>{if(!n.descomponible)n.descomponible=nodos.some(x=>x.padre===n.id)?"si":"";});
@@ -439,7 +447,7 @@
     ns.forEach(n=>{const p=byAcr[n._p];n.padre=p?p.id:"";delete n._p;});D.nodos=ns;normalize();save();renderAll();}
   $("f-imp").addEventListener("change",function(){const file=this.files[0];if(!file)return;const rd=new FileReader();
     rd.onload=()=>{try{if(/\.csv$/i.test(file.name))return fromCSV(rd.result);const o=JSON.parse(rd.result);
-      if(o.etapas&&o.nodos)return fromFlujo(o);if(o.nodos&&o.doc){D=o;normalize();save();renderAll();return;}throw new Error("No es una WBS ni un flujo del proyecto.");}
+      if(o.etapas&&o.nodos)return fromFlujo(o);if(o.nodos&&o.doc){if(!avisoOtro(o.doc.codigo))return;D=o;if(!D.doc.semaforo)D.doc.semaforo="rojo";normalize();save();renderAll();return;}throw new Error("No es una WBS ni un flujo del proyecto.");}
       catch(e){msg("No se pudo importar","Revisá el archivo: "+e.message);}};rd.readAsText(file,"utf-8");this.value="";});
 
   // ---------------------------------------------------------------- exportar

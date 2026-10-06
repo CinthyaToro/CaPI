@@ -240,7 +240,13 @@
   function h(tag,a,txt){const e=document.createElement(tag);if(a)for(const k in a){if(k==="class")e.className=a[k];else e.setAttribute(k,a[k]);}if(txt!=null)e.textContent=txt;return e;}
   const P=()=>D.personas[cur]||D.personas[0];
   const val=(p,n)=>String((p.r||{})[n]||"").trim();
-  const titulo=()=>{const a=D.personas.map(p=>val(p,7)).find(Boolean)||D.doc.titulo||"Concepto";return a.split(/[.\n]/)[0].slice(0,90);};
+  // Título y acrónimo desde la pregunta 7: «Nombre: descripción. Acrónimo: XxYy.» → «XxYy · Nombre».
+  const acronimo=s=>((String(s||"").match(/acr[oó]nimo\s*:?\s*([^\s.,;:]+)/i)||String(s||"").match(/\b([A-Za-zÁÉÍÓÚÑáéíóúñ]*[a-z][A-Z][A-Za-z0-9]*)\b/)||[])[1]||"");
+  const titulo=()=>{const a=D.personas.map(p=>val(p,7)).find(Boolean)||D.doc.titulo||"Concepto";const acr=acronimo(a);
+    let nom=a.split(/[:.\n]/)[0].trim();if(nom.length>60)nom=nom.slice(0,60).replace(/\s+\S*$/,"")+"…";return acr&&nom&&nom!==acr?acr+" · "+nom:(acr||nom);};
+  // ¿Lo que está abierto es todavía el ejemplo de SincLE? Entonces un CSV nuevo no se le suma: lo reemplaza.
+  const esEjemplo=()=>JSON.stringify(D.personas)===JSON.stringify(ORIG.personas);
+  const docNuevo=()=>({codigo:"",version:"0.1",fecha:new Date().toISOString().slice(0,10),estado:"Borrador",semaforo:"rojo",titulo:"",elaboro:"",reviso:"—",aprobo:"—",origen:""});
 
   // ---------------------------------------------------------------- vistas
   function renderResp(){const box=$("v-resp");box.innerHTML="";const p=P(),fe=$("fl-etapa").value,fv=$("fl-vacias").checked;let lastB=-1;
@@ -356,13 +362,17 @@
     if(v==="md")download(slug()+"_Idea-Proyecto.md",new Blob([mdDocumento()],{type:"text/markdown"}));
     if(v==="json")download(slug()+".json",new Blob([JSON.stringify(D,null,1)],{type:"application/json"}));});
   $("f-imp").addEventListener("change",async function(){const files=Array.from(this.files);this.value="";const res=[];
-    for(const f of files){try{const t=await f.text();if(/\.json$/i.test(f.name)){const o=JSON.parse(t);if(!o.doc||!o.personas)throw new Error("«"+f.name+"» no es un JSON de esta herramienta.");D=o;res.push("«"+f.name+"»: datos cargados.");}
-      else res.push(importCSV(t,f.name));}catch(e){res.push(e.message);}}
+    for(const f of files){try{const t=await f.text();if(/\.json$/i.test(f.name)){const o=JSON.parse(t);if(!o.doc||!o.personas)throw new Error("«"+f.name+"» no es un JSON de esta herramienta.");
+        // Este navegador guarda un solo Concepto: si hay otro proyecto abierto, avisar antes de reemplazarlo.
+        if(!esEjemplo()&&D.doc.codigo&&D.doc.codigo!==o.doc.codigo&&!confirm("En este navegador está abierto «"+(D.doc.codigo||titulo())+"». Si no lo exportaste, cancelá y exportá su JSON antes. ¿Reemplazarlo por «"+(o.doc.codigo||f.name)+"»?")){res.push("«"+f.name+"»: no se cargó.");continue;}
+        if(!o.doc.semaforo)o.doc.semaforo="rojo";D=o;res.push("«"+f.name+"»: datos cargados.");}
+      else{if(esEjemplo()){D={doc:docNuevo(),personas:[nueva("")]};res.push("Se sacó el ejemplo de SincLE: las respuestas no se mezclan con él.");}
+        res.push(importCSV(t,f.name));const acr=acronimo(D.personas.map(p=>val(p,7)).find(Boolean));if(!D.doc.codigo&&acr)D.doc.codigo=acr+"-CON-01";}}catch(e){res.push(e.message);}}
     save();cur=0;renderAll();msg("Importación",res.join("\n")+"\n\nSi un grupo respondió las dos etapas en formularios separados, importá los dos CSV: las respuestas se juntan por nombre.");});
   $("sel-p").addEventListener("change",function(){cur=+this.value;renderAll();});
   $("b-new").addEventListener("click",()=>{D.personas.push(nueva(""));cur=D.personas.length-1;save();renderAll();$("fl-etapa").value="";const t=document.querySelector("#q1 textarea");if(t)t.focus();});
   $("b-blank").addEventListener("click",()=>msg("Empezar en blanco","Se borran de este navegador las respuestas actuales (el ejemplo de SincLE sigue a la vista al lado de cada pregunta). Exportá antes si las querés conservar.",
-    [["Cancelar","",()=>dlg.close()],["Empezar en blanco","del",()=>{D={doc:{codigo:"",version:"0.1",fecha:new Date().toISOString().slice(0,10),estado:"Borrador",semaforo:"rojo",titulo:"",elaboro:"",reviso:"—",aprobo:"—",origen:""},personas:[nueva("")]};cur=0;save();dlg.close();renderAll();}]]));
+    [["Cancelar","",()=>dlg.close()],["Empezar en blanco","del",()=>{D={doc:docNuevo(),personas:[nueva("")]};cur=0;save();dlg.close();renderAll();}]]));
   $("b-reset").addEventListener("click",()=>msg("Volver a los datos del archivo","Se pierden los cambios guardados en este navegador.",[["Cancelar","",()=>dlg.close()],["Volver","del",()=>{try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);cur=0;dlg.close();renderAll();}]]));
   $("b-print").addEventListener("click",()=>window.print());
   ["fl-etapa","fl-vacias"].forEach(id=>$(id).addEventListener("change",renderResp));
