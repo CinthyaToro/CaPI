@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMFE de proceso DiDe</title>
+<!--
+  HERRAMIENTA "AMFE DE PROCESO Y PLAN DE CONTROL" DiDe — v0.1 (05/10/2026) — Cinthya Toro · CaPI / DiDe
+  Un solo archivo, sin dependencias. Paso de la ruta DiDe:
+    Concepto → A3 → Flujo del proyecto (→ Ruta de fabricación) → Ishikawa → AMFE de proceso y plan de control → WBS → Diccionario → BIM
+
+  AMFE = análisis de modos de falla y efectos. Toma cada paso de la ruta de fabricación y pregunta qué puede fallar
+  (modo), qué le pasa a la pieza o al dato (efecto) y por qué (causa, idealmente una causa del Ishikawa). Cada fila
+  se puntúa de 1 a 10: S (severidad), O (ocurrencia), D (detección). NPR = S × O × D. Se actúa cuando NPR ≥ umbral o
+  S ≥ umbral de severidad. El plan de control dice qué se mide en cada paso, con qué referencia, con qué frecuencia
+  y qué se hace si no cumple.
+
+  Importar (se reconoce solo):
+    - .json de esta herramienta;
+    - .json de la herramienta Flujo del proyecto: toma los pasos y los controles de una ruta de fabricación;
+    - .json de la herramienta Ishikawa: toma las causas, para unirlas a las filas y ver cuáles faltan;
+    - .csv "AMFE de proceso, esqueleto" exportado por la herramienta Flujo del proyecto.
+
+  FORMATO JSON
+  { "doc":   { codigo, version, fecha, estado, semaforo, titulo, alcance, elaboro, reviso, aprobo, autores, origen,
+               umbralNPR, umbralS, plan (prototipo|prelanzamiento|produccion) },
+    "pasos": [ { id, texto, acr } ],
+    "causas":[ { id, m, texto, estado } ],                      (del Ishikawa; opcional)
+    "filas": [ { id, paso, modo, efecto, s, causa, causaRef: [ids], o, prevencion, deteccion, d,
+                 accion, responsable, plazo, estadoAccion (abierta|en_curso|cerrada), s2, o2, d2, origen } ],
+    "plan":  [ { id, paso, caracteristica, tipo (calibracion|verificacion|validacion|calificacion), metodo,
+                 criterio, frecuencia, registro, reaccion, responsable } ] }
+
+  Impresión: A4 apaisado (A3 a pedido), márgenes ISO 5457, encabezado y pie en cada hoja con "Página n de N"
+  (Chrome o Edge 131 o posterior). …html#todo prepara la impresión completa; #plan, #acciones, #matriz abren vistas.
+-->
+<style>
+  :root{color-scheme:light;
+    --ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--muted:#615d54;--line:#cfc9b8;--teal:#1f6b62;
+    --ok:#2e7d32;--warn:#b58500;--nd:#b3261e;--hl:#fffbe8;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif)}
+  button,select,input,textarea{font:inherit}
+  .bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 18px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:13px}
+  .bar .grow{flex:1}
+  .bar button,.bar label.btn,.bar select{font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .bar button.ghost{background:transparent;color:#fff}
+  .bar button[aria-pressed="true"]{background:#ffd37a;border-color:#ffd37a}
+  .bar input[type=file]{display:none}
+  .page{max-width:1600px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .headdoc{background:var(--paper);border:1px solid var(--ink);padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+  .head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0 0 3px}
+  h1{font-size:23px;line-height:1.2;margin:0}
+  .sub{color:var(--muted);font-size:14px;margin:3px 0 0}
+  [data-f]{outline:none;border-radius:3px}
+  body.edit [data-f]{background:var(--hl);border-bottom:1px dotted var(--teal)}
+  .sema{border:2px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px;min-width:230px;font-family:var(--sans)}
+  .ctrl{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--ink);font-size:13px}
+  .ctrl div{padding:5px 8px;border-right:1px solid var(--ink);min-width:0}.ctrl div:last-child{border-right:0}
+  .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:-1px}
+  .hint{color:var(--muted);font-size:12.5px;font-family:var(--sans)}
+
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--sans);font-size:13.5px}
+  .tabs button{border:1px solid var(--ink);background:var(--paper);border-radius:5px 5px 0 0;padding:6px 12px;cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+  .tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--sans);font-size:13px}
+  .tools select,.tools button{border:1px solid var(--line);border-radius:4px;padding:4px 8px;background:var(--paper);cursor:pointer}
+
+  .view{display:none;background:var(--paper);border:1px solid var(--ink);padding:14px 18px}
+  .view.current{display:block}
+  .view h2{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--sans)}
+  th,td{text-align:left;vertical-align:top;padding:4px 6px;border:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:#faf8f2}
+  td.n{text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.falta{color:var(--warn);font-weight:600}
+  td.grupo{background:#eef3f1;font-weight:700;color:var(--teal);cursor:default}
+  tbody tr{cursor:pointer}tbody tr:hover td:not(.grupo){background:var(--hl)}
+  tr.alto td{font-weight:600}
+  .npr{display:inline-block;min-width:38px;padding:1px 6px;border-radius:4px;color:#fff;text-align:center}
+  .chip{display:inline-block;padding:0 6px;border-radius:999px;border:1px solid var(--line);font-size:11px}
+
+  .matriz{display:grid;grid-template-columns:40px repeat(10,minmax(36px,1fr));gap:3px;max-width:720px;font-family:var(--sans);font-size:12px}
+  .matriz div{min-height:36px;display:grid;place-items:center;border-radius:4px}
+  .matriz .ax{color:var(--muted);font-family:var(--mono)}
+  .matriz .c{color:#fff;font-weight:700;cursor:pointer}
+  .matriz .c.vacio{color:transparent;cursor:default}
+
+  .below{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px}
+  .box{background:var(--paper);border:1px solid var(--ink);border-radius:5px;padding:10px 13px;font-size:14px;line-height:1.45;min-width:0;font-family:var(--sans)}
+  .box h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px;color:var(--teal)}
+  .box ol{margin:0;padding-left:20px}.box li{margin:3px 0}
+  .box li a{color:var(--ink);text-decoration:underline dotted}
+  .box p{margin:0 0 6px}
+
+  .rotulo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1.5px solid var(--ink);font-size:11.5px;font-family:var(--sans);margin-bottom:10px}
+  .rotulo div{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:3px 6px;min-width:0}
+  .rotulo div:nth-child(4n){border-right:0}
+  .rotulo div:nth-last-child(-n+4){border-bottom:0}
+  .rotulo .wide{grid-column:span 3}
+  .print-only{display:none}
+
+  dialog{border:1px solid var(--ink);border-radius:8px;padding:0;max-width:720px;width:95vw;font-family:var(--sans)}
+  dialog::backdrop{background:rgba(20,18,14,.45)}
+  .dlg-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .dlg-h h3{margin:0;font-size:17px;line-height:1.3}
+  .dlg-b{padding:12px 16px;display:grid;gap:9px;font-size:14px;max-height:70vh;overflow:auto}
+  .dlg-b label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+  .dlg-b input,.dlg-b select,.dlg-b textarea{border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--ink);font-size:14px;width:100%}
+  .dlg-b fieldset{border:1px solid var(--line);border-radius:6px;display:grid;gap:8px;padding:8px 10px}
+  .dlg-b legend{font-size:12px;color:var(--teal);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:end}
+  .causas-ck{display:grid;gap:3px;max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:4px;padding:6px}
+  .causas-ck label{display:flex;gap:6px;align-items:flex-start;color:var(--ink);font-size:13px}
+  .causas-ck input{width:auto;margin-top:3px}
+  .nprlive{font-size:14px;color:var(--ink)}
+  .dlg-f{padding:10px 16px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+  .dlg-f button{padding:6px 12px;border-radius:4px;border:1px solid var(--ink);background:#fff;cursor:pointer}
+  .dlg-f button.pri{background:var(--ink);color:#fff}
+  .dlg-f button.del{border-color:var(--nd);color:var(--nd);margin-right:auto}
+  .ro p{margin:0}.ro .k{margin-bottom:2px}
+  .only-edit{display:none!important} body.edit .only-edit{display:inline-block!important}
+
+  @media print{
+    body{background:#fff}
+    .bar,.headdoc,.tabs,.tools,.below,dialog,.no-print{display:none!important}
+    .print-only{display:grid}
+    .page{display:block;padding:0;max-width:none}
+    .view{display:none!important;border:0;padding:0}
+    body.print-all .view,.view.current{display:block!important}
+    .view{break-before:page}
+    table{font-size:8.5pt}
+    th{font-size:7pt}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="papel"></style>
+</head>
+<body>
+
+<div class="bar">
+  <strong>AMFE de proceso DiDe</strong>
+  <button type="button" id="b-edit" aria-pressed="false">Editar</button>
+  <button type="button" id="b-add" class="only-edit">+ Fila</button>
+  <button type="button" id="b-pasos" class="only-edit">Pasos</button>
+  <span class="grow"></span>
+  <label class="btn" for="f-imp">Importar</label><input type="file" id="f-imp" accept=".json,.csv">
+  <select id="sel-exp" aria-label="Exportar">
+    <option value="">Exportar…</option>
+    <option value="json">Datos (.json)</option>
+    <option value="amfe">AMFE (.csv)</option>
+    <option value="plan">Plan de control (.csv)</option>
+    <option value="md">AMFE y plan (.md)</option>
+  </select>
+  <label>Papel <select id="sel-papel" aria-label="Tamaño de papel"><option value="A4">A4</option><option value="A3">A3</option></select></label>
+  <button type="button" id="b-print">Imprimir todo</button>
+  <button type="button" id="b-print-v">Imprimir esta vista</button>
+  <button type="button" id="b-reset" class="ghost">Volver a los datos del archivo</button>
+</div>
+
+<main class="page" id="page">
+  <section class="headdoc" aria-label="Control documental">
+    <div class="head">
+      <div>
+        <p class="kicker">DiDe — AMFE de proceso y plan de control</p>
+        <h1 data-f="titulo"></h1>
+        <p class="sub">Alcance: <span data-f="alcance"></span></p>
+      </div>
+      <div class="sema" id="sema"><span class="k">Semáforo</span><span class="dot" id="sema-dot"></span> <b id="sema-txt"></b>
+        <select id="sema-sel" class="only-edit" aria-label="Color del semáforo"><option value="rojo">rojo</option><option value="amarillo">amarillo</option><option value="verde">verde</option></select>
+        <br><span id="sema-desc" class="hint"></span></div>
+    </div>
+    <div class="ctrl">
+      <div><span class="k">Código</span><span data-f="codigo"></span></div>
+      <div><span class="k">Versión · estado</span><span data-f="version"></span> · <span data-f="estado"></span></div>
+      <div><span class="k">Umbrales</span>NPR ≥ <span data-f="umbralNPR"></span> · S ≥ <span data-f="umbralS"></span></div>
+      <div><span class="k">Autores</span><span data-f="autores"></span></div>
+      <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+      <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+      <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+    </div>
+    <p class="hint" style="margin:0">Origen: <span data-f="origen"></span></p>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Vistas"></nav>
+  <div class="tools">
+    <label>Paso <select id="fl-paso"><option value="">todos</option></select></label>
+    <label><input type="checkbox" id="fl-alto"> sólo las que superan el umbral</label>
+    <label>Orden <select id="fl-orden"><option value="paso">por paso</option><option value="npr">por NPR</option></select></label>
+    <span id="fl-celda" class="hint"></span>
+  </div>
+
+  <section class="view" data-view="amfe" aria-label="AMFE">
+    <div class="rotulo print-only" data-rot="AMFE de proceso"></div>
+    <h2>AMFE de proceso</h2>
+    <p class="hint no-print">S = severidad del efecto · O = ocurrencia de la causa · D = detección (10 = no se detecta) · NPR = S × O × D. Las filas en negrita superan el umbral. Clic en una fila para verla o editarla.</p>
+    <table><thead><tr><th>Paso</th><th>Modo de falla</th><th>Efecto</th><th>S</th><th>Causa</th><th>O</th><th>Prevención actual</th><th>Detección actual</th><th>D</th><th>NPR</th><th>Acción</th><th>NPR después</th></tr></thead><tbody id="t-amfe"></tbody></table>
+  </section>
+
+  <section class="view" data-view="acciones" aria-label="Acciones">
+    <div class="rotulo print-only" data-rot="Acciones del AMFE"></div>
+    <h2>Acciones</h2>
+    <table><thead><tr><th>#</th><th>Acción</th><th>Fila (paso · modo)</th><th>NPR</th><th>Responsable</th><th>Plazo</th><th>Estado</th><th>NPR después</th></tr></thead><tbody id="t-acc"></tbody></table>
+  </section>
+
+  <section class="view" data-view="matriz" aria-label="Matriz de riesgo">
+    <div class="rotulo print-only" data-rot="Matriz severidad × ocurrencia"></div>
+    <h2>Matriz severidad × ocurrencia</h2>
+    <p class="hint">Cada casilla cuenta las filas con esa severidad (filas) y esa ocurrencia (columnas). Clic en una casilla para ver sus filas.</p>
+    <div class="matriz" id="matriz"></div>
+  </section>
+
+  <section class="view" data-view="plan" aria-label="Plan de control">
+    <div class="rotulo print-only" data-rot="Plan de control"></div>
+    <h2>Plan de control · <span id="plan-tipo"></span></h2>
+    <p class="hint no-print">Prototipo: se mide todo en cada pieza porque todavía no se conoce la variación. Prelanzamiento y producción: la frecuencia se baja con datos.</p>
+    <table><thead><tr><th>Paso</th><th>Característica</th><th>Tipo</th><th>Método y referencia</th><th>Criterio</th><th>Frecuencia</th><th>Registro</th><th>Plan de reacción</th><th>Responsable</th></tr></thead><tbody id="t-plan"></tbody></table>
+    <p class="no-print" style="margin:8px 0 0"><button type="button" class="only-edit" id="b-add-plan">+ Fila del plan</button></p>
+  </section>
+
+  <div class="below">
+    <div class="box" id="preguntas"></div>
+    <div class="box" id="sintesis"></div>
+  </div>
+</main>
+
+<template id="tpl-rot">
+  <div class="wide"><span class="k">Título</span><span data-f="titulo"></span></div>
+  <div><span class="k">Código</span><b data-f="codigo"></b></div>
+  <div class="wide"><span class="k">Documento</span><span class="rot-diag"></span></div>
+  <div><span class="k">Semáforo</span><span class="sema-name"></span></div>
+  <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+  <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+  <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+  <div><span class="k">Versión · fecha</span><span data-f="version"></span> · <span data-f="fecha"></span></div>
+</template>
+
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <div class="dlg-h"><h3 id="dlg-t"></h3><button type="button" id="d-x" aria-label="Cerrar" style="border:0;background:none;font-size:20px;cursor:pointer">×</button></div>
+  <div class="dlg-b" id="dlg-b"></div>
+  <div class="dlg-f" id="dlg-f"></div>
+</dialog>
+
+<!-- DATOS: ejemplo ilustrativo (SincLE, público; SincLE todavía no está construido). Reemplazar por los del proyecto. -->
+<script id="datos" type="application/json">
+{
+ "doc": {
+  "codigo": "SincLE-AMFE-01", "version": "0.1", "fecha": "2026-10-05", "estado": "Ejemplo ilustrativo", "semaforo": "verde",
+  "titulo": "SincLE · armado e integración del sincronizador",
+  "alcance": "Ruta de armado de SincLE, de la especificación de señales a la validación con espectros",
+  "elaboro": "Cinthya Toro", "reviso": "—", "aprobo": "—", "autores": "Cinthya Toro",
+  "origen": "Ejemplo ilustrativo: las causas son las del ejemplo del Ishikawa DiDe (SincLE). SincLE todavía no está construido; los puntajes muestran el método, no datos medidos.",
+  "umbralNPR": 150, "umbralS": 9, "plan": "prototipo"
+ },
+ "pasos": [
+  {"id": "a1", "texto": "Especificar las señales del láser y del espectrómetro", "acr": "mpl.rmd.spc"},
+  {"id": "a2", "texto": "Armar el acople (optoacopladores, resistencias, protecciones)", "acr": "mpl.rmd.rmr"},
+  {"id": "a3", "texto": "Programar el Arduino (.ino) y el control (.py)", "acr": "mpl.rmd.prg"},
+  {"id": "a4", "texto": "Conectar los coaxiles e integrar", "acr": "mpl.rmd.cnc"},
+  {"id": "a5", "texto": "Medir el retardo real entre los pulsos", "acr": "vld.mdr"},
+  {"id": "a6", "texto": "Validar con espectros a distintos retardos", "acr": "vld.cmp"}
+ ],
+ "causas": [
+  {"id": "c1", "m": "Método", "texto": "El retardo se fija por software", "estado": "no_dominada"},
+  {"id": "c2", "m": "Máquina", "texto": "Los dos instrumentos sólo funcionan como Master", "estado": "no_dominada"},
+  {"id": "c3", "m": "Máquina", "texto": "Arduino Mega como generador de pulsos TTL", "estado": "variable"},
+  {"id": "c4", "m": "Materiales", "texto": "Retardo propio de optoacopladores y cables", "estado": "variable"},
+  {"id": "c5", "m": "Medición", "texto": "¿Con qué se verifica el retardo real?", "estado": "sin_evaluar"},
+  {"id": "c6", "m": "Mano de obra", "texto": "El retardo se cambia a mano en cada experimento", "estado": "variable"},
+  {"id": "c7", "m": "Medio ambiente", "texto": "Ruido eléctrico del láser en las señales", "estado": "sin_evaluar"}
+ ],
+ "filas": [
+  {"id": "f1", "paso": "a1", "modo": "Nivel o flanco de disparo mal especificado", "efecto": "Un instrumento no dispara o dispara tarde", "s": 8, "causa": "Los dos instrumentos sólo funcionan como Master", "causaRef": ["c2"], "o": 4, "prevencion": "Hojas de datos de ambos equipos", "deteccion": "Prueba de disparo con osciloscopio", "d": 3, "accion": "", "responsable": "", "plazo": "", "estadoAccion": "", "origen": "CT"},
+  {"id": "f2", "paso": "a2", "modo": "Retardo propio del acople distinto del supuesto", "efecto": "El retardo real no es el programado", "s": 7, "causa": "Retardo de optoacopladores y cables", "causaRef": ["c4"], "o": 6, "prevencion": "", "deteccion": "", "d": 7, "accion": "Medir el retardo de cada componente y descontarlo en el software", "responsable": "CT", "plazo": "", "estadoAccion": "abierta", "origen": "CT"},
+  {"id": "f3", "paso": "a2", "modo": "Ruido del láser acoplado a la señal", "efecto": "Disparos falsos del espectrómetro", "s": 8, "causa": "Ruido eléctrico del láser", "causaRef": ["c7"], "o": 5, "prevencion": "Optoacopladores", "deteccion": "", "d": 6, "accion": "Blindaje y ensayo con el láser disparando", "responsable": "", "plazo": "", "estadoAccion": "abierta", "origen": "CT"},
+  {"id": "f4", "paso": "a3", "modo": "Temporización del Arduino variable entre disparos", "efecto": "El retardo cambia de un disparo a otro", "s": 8, "causa": "Arduino Mega como generador de pulsos", "causaRef": ["c3", "c1"], "o": 5, "prevencion": "", "deteccion": "Osciloscopio", "d": 4, "accion": "Medir la repetibilidad del retardo en 1000 disparos", "responsable": "CT", "plazo": "", "estadoAccion": "en_curso", "origen": "CT"},
+  {"id": "f5", "paso": "a4", "modo": "Retardo cambiado a mano con error", "efecto": "Un experimento queda con un retardo equivocado", "s": 6, "causa": "El retardo se cambia a mano", "causaRef": ["c6"], "o": 5, "prevencion": "", "deteccion": "Cuaderno de laboratorio", "d": 6, "accion": "Guardar el retardo en el archivo de cada espectro, automáticamente", "responsable": "", "plazo": "", "estadoAccion": "abierta", "origen": "CT"},
+  {"id": "f6", "paso": "a5", "modo": "Osciloscopio sin calibración vigente", "efecto": "El retardo medido no tiene respaldo", "s": 9, "causa": "No está definido con qué se verifica el retardo", "causaRef": ["c5"], "o": 4, "prevencion": "", "deteccion": "", "d": 7, "accion": "Usar un osciloscopio con certificado vigente", "responsable": "", "plazo": "", "estadoAccion": "abierta", "origen": "CT"},
+  {"id": "f7", "paso": "a6", "modo": "Comparación con el NIST sin criterio de aceptación", "efecto": "No se puede afirmar que el retardo es el correcto", "s": 7, "causa": "Criterio de aceptación no definido", "causaRef": [], "o": 6, "prevencion": "", "deteccion": "", "d": 6, "accion": "Definir las líneas y las tolerancias de comparación", "responsable": "", "plazo": "", "estadoAccion": "abierta", "origen": "CT"}
+ ],
+ "plan": [
+  {"id": "k1", "paso": "a5", "caracteristica": "Retardo entre pulsos", "tipo": "verificacion", "metodo": "Osciloscopio con calibración vigente", "criterio": "Igual al programado, dentro de la tolerancia a fijar", "frecuencia": "Al empezar cada sesión", "registro": "Archivo del experimento", "reaccion": "No adquirir hasta corregir", "responsable": "CT"},
+  {"id": "k2", "paso": "a6", "caracteristica": "Posición de las líneas espectrales", "tipo": "validacion", "metodo": "Base de datos de líneas del NIST", "criterio": "", "frecuencia": "Cada cambio de retardo", "registro": "Archivo del experimento", "reaccion": "", "responsable": ""}
+ ]
+}
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const CTL={calibracion:"Calibración",verificacion:"Verificación",validacion:"Validación",calificacion:"Calificación"};
+  const EST={abierta:"Abierta",en_curso:"En curso",cerrada:"Cerrada"};
+  const PLAN={prototipo:"de prototipo",prelanzamiento:"de prelanzamiento",produccion:"de producción"};
+  const SEMA={rojo:{h:"#b3261e",d:"Sólo autores y capacitadora."},amarillo:{h:"#b58500",d:"Todo el grupo."},verde:{h:"#2e7d32",d:"Público."}};
+  const ORIG=JSON.parse(document.getElementById("datos").textContent);
+  let D,KEY,view="amfe",celda=null;
+  const $=id=>document.getElementById(id);
+  let pref={papel:"A4"};try{const p=JSON.parse(localStorage.getItem("dide-amfe-pref")||"null");if(p)pref=Object.assign(pref,p);}catch(e){}
+  const savePref=()=>{try{localStorage.setItem("dide-amfe-pref",JSON.stringify(pref));}catch(e){}};
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  function load(){KEY="dide-amfe-"+(ORIG.doc.codigo||"x");D=clone(ORIG);try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s);}catch(e){}normalize();}
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}};
+  function normalize(){D.doc=D.doc||{};["pasos","causas","filas","plan"].forEach(k=>D[k]=D[k]||[]);
+    D.doc.umbralNPR=+D.doc.umbralNPR||150;D.doc.umbralS=+D.doc.umbralS||9;D.doc.plan=PLAN[D.doc.plan]?D.doc.plan:"prototipo";
+    D.filas.forEach(f=>{["s","o","d","s2","o2","d2"].forEach(k=>{f[k]=f[k]===""||f[k]==null?"":Math.max(1,Math.min(10,+f[k]||0))||"";});f.causaRef=f.causaRef||[];});}
+  let seq=Date.now();const uid=p=>p+(seq++).toString(36);
+  const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const trunc=(s,n)=>(s=String(s||""),s.length>n?s.slice(0,n-1)+"…":s);
+  const cssStr=s=>'"'+String(s||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/[\r\n]+/g," ")+'"';
+  function h(tag,a,txt){const e=document.createElement(tag);if(a)for(const k in a){if(k==="class")e.className=a[k];else e.setAttribute(k,a[k]);}if(txt!=null)e.textContent=txt;return e;}
+
+  // ---------------------------------------------------------------- cálculos
+  const npr=f=>(f.s&&f.o&&f.d)?f.s*f.o*f.d:"";
+  const npr2=f=>(f.s2&&f.o2&&f.d2)?f.s2*f.o2*f.d2:"";
+  const alto=f=>(+npr(f)>=D.doc.umbralNPR)||(+f.s>=D.doc.umbralS);
+  function color(v){if(v==="")return"#cfc9b8";const u=D.doc.umbralNPR;return v>=u*1.5?"#b3261e":v>=u?"#d4651c":v>=u*0.6?"#b58500":"#2e7d32";}
+  const pasoDe=id=>D.pasos.find(p=>p.id===id);
+  const pasoTxt=id=>{const p=pasoDe(id);return p?(D.pasos.indexOf(p)+1)+" · "+p.texto:(id||"—");};
+  function filasVisibles(){const fp=$("fl-paso").value,fa=$("fl-alto").checked;
+    let L=D.filas.filter(f=>(!fp||f.paso===fp)&&(!fa||alto(f))&&(!celda||(+f.s===celda[0]&&+f.o===celda[1])));
+    if($("fl-orden").value==="npr")L=L.slice().sort((a,b)=>(+npr(b)||0)-(+npr(a)||0));
+    else{const ord=id=>{const i=D.pasos.findIndex(p=>p.id===id);return i<0?999:i;};L=L.slice().sort((a,b)=>ord(a.paso)-ord(b.paso));}
+    return L;}
+
+  // ---------------------------------------------------------------- vistas
+  function td(tr,v,cls){const c=h("td",cls?{"class":cls}:null,v==null?"":String(v));tr.appendChild(c);return c;}
+  function nprCell(tr,v){const c=h("td",{"class":"n"});const s=h("span",{"class":"npr"},v===""?"—":String(v));s.style.background=color(v);c.appendChild(s);tr.appendChild(c);}
+  function renderAMFE(){const tb=$("t-amfe");tb.innerHTML="";let last=null;const porPaso=$("fl-orden").value==="paso";
+    filasVisibles().forEach(f=>{
+      if(porPaso&&f.paso!==last){last=f.paso;const g=h("tr");const c=h("td",{"class":"grupo",colspan:12},pasoTxt(f.paso)+(pasoDe(f.paso)&&pasoDe(f.paso).acr?"  ·  "+pasoDe(f.paso).acr:""));g.appendChild(c);tb.appendChild(g);}
+      const tr=h("tr");if(alto(f))tr.className="alto";
+      td(tr,porPaso?"":trunc(pasoTxt(f.paso),40));td(tr,f.modo,!f.modo&&"falta");td(tr,f.efecto,!f.efecto&&"falta");td(tr,f.s||"¿?",f.s?"n":"n falta");
+      const causas=f.causaRef.map(id=>id).join(", ");td(tr,(f.causa||"")+(causas?" ("+causas+")":""),!f.causa&&!causas&&"falta");
+      td(tr,f.o||"¿?",f.o?"n":"n falta");td(tr,f.prevencion||"—");td(tr,f.deteccion||"—");td(tr,f.d||"¿?",f.d?"n":"n falta");nprCell(tr,npr(f));
+      td(tr,f.accion?(f.accion+(f.estadoAccion?" ["+(EST[f.estadoAccion]||f.estadoAccion)+"]":"")):(alto(f)?"¿?":""),!f.accion&&alto(f)&&"falta");
+      const v2=npr2(f);if(v2==="")td(tr,"","n");else nprCell(tr,v2);
+      tr.addEventListener("click",()=>openFila(f));tb.appendChild(tr);});
+    if(!tb.rows.length){const tr=h("tr");tr.appendChild(h("td",{colspan:12,"class":"hint"},"No hay filas con este filtro."));tb.appendChild(tr);}}
+  function renderAcc(){const tb=$("t-acc");tb.innerHTML="";let i=0;
+    D.filas.filter(f=>f.accion||alto(f)).sort((a,b)=>(+npr(b)||0)-(+npr(a)||0)).forEach(f=>{const tr=h("tr");i++;
+      td(tr,i,"n");td(tr,f.accion||"¿?",!f.accion&&"falta");td(tr,trunc(pasoTxt(f.paso),40)+" · "+f.modo);nprCell(tr,npr(f));
+      td(tr,f.responsable||(f.accion?"¿?":""),f.accion&&!f.responsable&&"falta");td(tr,f.plazo||"");td(tr,EST[f.estadoAccion]||(f.accion?"Abierta":""));
+      const v2=npr2(f);if(v2==="")td(tr,"","n");else nprCell(tr,v2);tr.addEventListener("click",()=>openFila(f));tb.appendChild(tr);});}
+  function renderMatriz(){const m=$("matriz");m.innerHTML="";m.appendChild(h("div",{"class":"ax"},"S \\ O"));
+    for(let o=1;o<=10;o++)m.appendChild(h("div",{"class":"ax"},String(o)));
+    for(let s=10;s>=1;s--){m.appendChild(h("div",{"class":"ax"},String(s)));
+      for(let o=1;o<=10;o++){const n=D.filas.filter(f=>+f.s===s&&+f.o===o).length;const c=h("div",{"class":"c"+(n?"":" vacio"),title:"S "+s+" · O "+o+": "+n+" fila(s)"},n?String(n):"·");
+        const so=s*o;c.style.background=n?(so>=56||s>=D.doc.umbralS?"#b3261e":so>=30?"#d4651c":so>=16?"#b58500":"#2e7d32"):(so>=56?"#f6dddb":so>=30?"#f8e6d6":so>=16?"#f6efd9":"#e3efe4");
+        if(n)c.addEventListener("click",()=>{celda=[s,o];show("amfe");renderAll();});m.appendChild(c);}}}
+  function renderPlan(){const tb=$("t-plan");tb.innerHTML="";$("plan-tipo").textContent=PLAN[D.doc.plan];
+    const ord=id=>{const i=D.pasos.findIndex(p=>p.id===id);return i<0?999:i;};
+    D.plan.slice().sort((a,b)=>ord(a.paso)-ord(b.paso)).forEach(k=>{const tr=h("tr");
+      td(tr,trunc(pasoTxt(k.paso),40));td(tr,k.caracteristica,!k.caracteristica&&"falta");td(tr,CTL[k.tipo]||"");td(tr,k.metodo||"¿?",!k.metodo&&"falta");
+      td(tr,k.criterio||"¿?",!k.criterio&&"falta");td(tr,k.frecuencia||"¿?",!k.frecuencia&&"falta");td(tr,k.registro||"");td(tr,k.reaccion||"¿?",!k.reaccion&&"falta");td(tr,k.responsable||"");
+      tr.addEventListener("click",()=>openPlan(k));tb.appendChild(tr);});}
+
+  // ---------------------------------------------------------------- preguntas y síntesis
+  function preguntas(){const Q=[],u=D.doc.umbralNPR;const fn=f=>"«"+trunc(f.modo||"(sin modo)",50)+"» ("+trunc(pasoTxt(f.paso),30)+")";
+    D.causas.forEach(c=>{if(!D.filas.some(f=>f.causaRef.includes(c.id)))Q.push({t:"La causa «"+c.texto+"» ("+(c.m||"")+") del Ishikawa no está en ninguna fila: ¿en qué paso actúa, o es un requisito que falta?"});});
+    D.pasos.forEach(p=>{if(!D.filas.some(f=>f.paso===p.id))Q.push({t:"¿Qué puede fallar en el paso «"+p.texto+"»?",p:p.id});});
+    D.filas.forEach(f=>{const r={f:f.id};
+      if(!f.modo||!f.efecto)Q.push({t:fn(f)+": falta el modo de falla o el efecto.",r});
+      if(!f.causa&&!f.causaRef.length)Q.push({t:fn(f)+": ¿por qué fallaría? Falta la causa.",r});
+      if(!f.s||!f.o||!f.d)Q.push({t:fn(f)+": falta puntuar S, O o D.",r});
+      if(alto(f)&&!f.accion)Q.push({t:fn(f)+": supera el umbral"+(+f.s>=D.doc.umbralS?" de severidad":"")+" y no tiene acción.",r});
+      if(f.accion&&!f.responsable)Q.push({t:fn(f)+": la acción no tiene responsable.",r});
+      if(f.estadoAccion==="cerrada"&&npr2(f)==="")Q.push({t:fn(f)+": la acción está cerrada; volvé a puntuar S, O y D para ver si bajó el riesgo.",r});
+      if(+f.o>=7&&!f.prevencion)Q.push({t:fn(f)+": la causa ocurre seguido y no hay prevención: ¿qué la evitaría?",r});
+      if(+f.d>=7)Q.push({t:fn(f)+": se detecta tarde o no se detecta: ¿qué control la detectaría antes?",r});
+      if(npr2(f)!==""&&+npr2(f)>=+npr(f))Q.push({t:fn(f)+": después de la acción el riesgo no bajó.",r});});
+    D.pasos.forEach(p=>{if(!D.plan.some(k=>k.paso===p.id))Q.push({t:"El paso «"+p.texto+"» no tiene ninguna característica en el plan de control.",p:p.id});});
+    D.plan.forEach(k=>{const r={k:k.id};const nm="Plan · «"+trunc(k.caracteristica||"(sin característica)",40)+"»";
+      if(!k.metodo)Q.push({t:nm+": ¿con qué método y contra qué referencia se mide?",r});
+      if(!k.criterio)Q.push({t:nm+": ¿cuál es el criterio de aceptación?",r});
+      if(!k.frecuencia)Q.push({t:nm+": ¿cada cuánto se mide?"+(D.doc.plan==="prototipo"?" En un plan de prototipo, lo habitual es cada pieza.":""),r});
+      if(!k.reaccion)Q.push({t:nm+": ¿qué se hace si no cumple?",r});});
+    return Q;}
+  function renderPreguntas(){const box=$("preguntas"),Q=preguntas();box.innerHTML="";box.appendChild(h("h2",null,"Preguntas para el equipo ("+Q.length+")"));
+    if(!Q.length){box.appendChild(h("p",{"class":"hint"},"No quedan preguntas abiertas."));return;}
+    const ol=h("ol");Q.forEach(q=>{const li=h("li");
+      if(q.r||q.p){const a=h("a",{href:"#"},q.t);a.addEventListener("click",ev=>{ev.preventDefault();
+        if(q.r&&q.r.f)openFila(D.filas.find(f=>f.id===q.r.f));else if(q.r&&q.r.k)openPlan(D.plan.find(k=>k.id===q.r.k));else{$("fl-paso").value=q.p;show("amfe");renderAll();}});li.appendChild(a);}
+      else li.appendChild(document.createTextNode(q.t));ol.appendChild(li);});box.appendChild(ol);}
+  function renderSintesis(){const box=$("sintesis");box.innerHTML="";box.appendChild(h("h2",null,"Síntesis (se calcula sola)"));
+    const add=t=>box.appendChild(h("p",null,t));const F=D.filas,v=F.map(npr).filter(x=>x!=="");
+    add(F.length+" filas en "+D.pasos.length+" pasos. NPR máximo: "+(v.length?Math.max.apply(null,v):"—")+"; promedio: "+(v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):"—")+".");
+    add(F.filter(alto).length+" filas superan el umbral (NPR ≥ "+D.doc.umbralNPR+" o S ≥ "+D.doc.umbralS+"); "+F.filter(f=>+f.s>=D.doc.umbralS).length+" con severidad ≥ "+D.doc.umbralS+".");
+    const A=F.filter(f=>f.accion);add("Acciones: "+A.filter(f=>(f.estadoAccion||"abierta")==="abierta").length+" abiertas, "+A.filter(f=>f.estadoAccion==="en_curso").length+" en curso, "+A.filter(f=>f.estadoAccion==="cerrada").length+" cerradas.");
+    const cer=A.filter(f=>npr2(f)!=="");if(cer.length){const a=cer.reduce((s,f)=>s+npr(f),0),b=cer.reduce((s,f)=>s+npr2(f),0);add("En las filas re-puntuadas, el NPR total bajó de "+a+" a "+b+".");}
+    if(D.causas.length){const cub=D.causas.filter(c=>F.some(f=>f.causaRef.includes(c.id))).length;add("Causas del Ishikawa cubiertas: "+cub+" de "+D.causas.length+".");}
+    const top=F.filter(f=>npr(f)!=="").sort((a,b)=>npr(b)-npr(a)).slice(0,3);
+    if(top.length)add("Riesgos más altos: "+top.map(f=>"«"+trunc(f.modo,45)+"» ("+npr(f)+")").join(" · ")+".");}
+  function renderDoc(){document.querySelectorAll("[data-f]").forEach(e=>{if(document.activeElement!==e)e.textContent=D.doc[e.dataset.f]==null?"":String(D.doc[e.dataset.f]);});
+    const s=SEMA[D.doc.semaforo]||SEMA.rojo;$("sema").style.borderColor=s.h;$("sema-dot").style.background=s.h;$("sema-txt").textContent=D.doc.semaforo||"rojo";$("sema-txt").style.color=s.h;$("sema-desc").textContent=s.d;$("sema-sel").value=D.doc.semaforo||"rojo";
+    document.querySelectorAll(".sema-name").forEach(e=>{e.textContent=(D.doc.semaforo||"rojo")+" — "+s.d;e.style.color=s.h;});document.title="AMFE — "+(D.doc.titulo||"");applyPaper();}
+  function renderRotulos(){document.querySelectorAll("[data-rot]").forEach(r=>{r.innerHTML="";r.appendChild($("tpl-rot").content.cloneNode(true));r.querySelector(".rot-diag").textContent=r.dataset.rot;});}
+  function renderFilters(){const f=$("fl-paso"),v=f.value;f.innerHTML='<option value="">todos</option>';D.pasos.forEach((p,i)=>f.appendChild(h("option",{value:p.id},(i+1)+" · "+trunc(p.texto,40))));f.value=D.pasos.some(p=>p.id===v)?v:"";
+    $("fl-celda").textContent=celda?"Casilla S "+celda[0]+" · O "+celda[1]+" ":"";if(celda){const b=h("button",{type:"button"},"quitar");b.addEventListener("click",()=>{celda=null;renderAll();});$("fl-celda").appendChild(b);}}
+  function renderTabs(){const nav=$("tabs");nav.innerHTML="";[["amfe","AMFE"],["acciones","Acciones"],["matriz","Matriz S × O"],["plan","Plan de control"]].forEach(([v,t])=>{
+    const b=h("button",{type:"button",role:"tab","aria-selected":String(view===v)},t);b.addEventListener("click",()=>show(v));nav.appendChild(b);});}
+  function show(v){view=v;document.querySelectorAll(".view").forEach(s=>s.classList.toggle("current",s.dataset.view===view));renderTabs();}
+  function renderAll(){normalize();renderRotulos();renderFilters();renderAMFE();renderAcc();renderMatriz();renderPlan();renderPreguntas();renderSintesis();renderDoc();show(view);bindDocFields();}
+
+  // ---------------------------------------------------------------- diálogos
+  const dlg=$("dlg");
+  function dlgOpen(t){$("dlg-t").textContent=t;$("dlg-b").innerHTML="";$("dlg-b").className="dlg-b";$("dlg-f").innerHTML="";if(!dlg.open)dlg.showModal();return $("dlg-b");}
+  function btn(t,cls,fn){const x=h("button",{type:"button"},t);if(cls)x.className=cls;x.addEventListener("click",fn);$("dlg-f").appendChild(x);return x;}
+  function field(p,lbl,val,type,opts){const l=h("label",null,lbl);let i;
+    if(type==="select"){i=h("select");opts.forEach(o=>i.appendChild(h("option",{value:o[0]},o[1])));i.value=val==null?"":String(val);}
+    else if(type==="area"){i=h("textarea",{rows:2});i.value=val||"";}else{i=h("input",{type:"text"});i.value=val==null?"":String(val);}
+    l.appendChild(i);p.appendChild(l);return i;}
+  const ESC=[["","—"]].concat([1,2,3,4,5,6,7,8,9,10].map(n=>[String(n),String(n)]));
+  const AYUDA={s:"Severidad del efecto: 9–10 invalida los datos o hay riesgo para las personas; 7–8 pérdida grande o dato erróneo; 4–6 moderada; 1–3 menor.",
+               o:"Ocurrencia de la causa: 9–10 casi siempre; 7–8 frecuente (hoy no hay control); 4–6 ocasional; 1–3 rara.",
+               d:"Detección: 9–10 no se detecta; 7–8 se detecta tarde (al final); 4–6 en el paso, con un método no validado; 1–3 en el paso, con un método validado."};
+  const editing=()=>document.body.classList.contains("edit");
+  function setEdit(on){document.body.classList.toggle("edit",on);$("b-edit").setAttribute("aria-pressed",String(on));document.querySelectorAll("[data-f]").forEach(e=>e.contentEditable=on?"true":"false");}
+  function readOnly(b,rows){b.className="dlg-b ro";rows.forEach(r=>{if(r[1]===""||r[1]==null)return;const d=h("div");d.appendChild(h("span",{"class":"k"},r[0]));d.appendChild(h("p",null,String(r[1])));b.appendChild(d);});}
+  function openFila(f){const isNew=!f;
+    if(!editing()&&!isNew){const b=dlgOpen(f.modo||"Fila del AMFE");
+      readOnly(b,[["Paso",pasoTxt(f.paso)],["Efecto",f.efecto],["Causa",f.causa],["Causas del Ishikawa",f.causaRef.map(id=>{const c=D.causas.find(x=>x.id===id);return c?id+" · "+c.texto:id;}).join(" · ")],
+        ["S · O · D · NPR",[f.s||"¿?",f.o||"¿?",f.d||"¿?",npr(f)||"—"].join(" · ")],["Prevención actual",f.prevencion],["Detección actual",f.deteccion],["Acción",f.accion],["Responsable",f.responsable],["Plazo",f.plazo],["Estado",EST[f.estadoAccion]],
+        ["NPR después",npr2(f)===""?"":[f.s2,f.o2,f.d2,npr2(f)].join(" · ")],["Origen",f.origen]]);
+      btn("Editar","",()=>{setEdit(true);openFila(f);});btn("Cerrar","pri",()=>dlg.close());return;}
+    f=f||{id:uid("f"),paso:$("fl-paso").value||(D.pasos[0]||{}).id||"",modo:"",efecto:"",s:"",causa:"",causaRef:[],o:"",prevencion:"",deteccion:"",d:"",accion:"",responsable:"",plazo:"",estadoAccion:"",s2:"",o2:"",d2:"",origen:""};
+    const b=dlgOpen(isNew?"Nueva fila del AMFE":"Editar fila");
+    const fP=field(b,"Paso",f.paso,"select",D.pasos.map((p,i)=>[p.id,(i+1)+" · "+p.texto]));
+    const fM=field(b,"Modo de falla (qué puede salir mal)",f.modo,"area");const fE=field(b,"Efecto (qué le pasa a la pieza o al dato)",f.efecto,"area");
+    const fC=field(b,"Causa (por qué saldría mal)",f.causa,"area");
+    let cks=[];if(D.causas.length){const l=h("label",null,"Causas del Ishikawa");const box=h("div",{"class":"causas-ck"});
+      D.causas.forEach(c=>{const r=h("label");const i=h("input",{type:"checkbox",value:c.id});i.checked=f.causaRef.includes(c.id);r.appendChild(i);r.appendChild(document.createTextNode(c.id+" · "+(c.m?c.m+": ":"")+c.texto));box.appendChild(r);cks.push(i);});
+      l.appendChild(box);b.appendChild(l);}
+    const fs1=h("fieldset");fs1.appendChild(h("legend",null,"Puntaje actual"));b.appendChild(fs1);const r1=h("div",{"class":"row3"});fs1.appendChild(r1);
+    const fS=field(r1,"S (severidad)",f.s,"select",ESC),fO=field(r1,"O (ocurrencia)",f.o,"select",ESC),fD=field(r1,"D (detección)",f.d,"select",ESC);const live=h("div",{"class":"nprlive"});r1.appendChild(live);
+    fs1.appendChild(h("p",{"class":"hint",style:"margin:0"},AYUDA.s+" "+AYUDA.o+" "+AYUDA.d));
+    const r2=h("div",{"class":"row2"});fs1.appendChild(r2);const fPr=field(r2,"Prevención actual",f.prevencion,"area"),fDe=field(r2,"Detección actual",f.deteccion,"area");
+    const fs2=h("fieldset");fs2.appendChild(h("legend",null,"Acción"));b.appendChild(fs2);
+    const fA=field(fs2,"Acción recomendada",f.accion,"area");const r3=h("div",{"class":"row3"});fs2.appendChild(r3);
+    const fR=field(r3,"Responsable",f.responsable),fPl=field(r3,"Plazo",f.plazo),fEs=field(r3,"Estado",f.estadoAccion,"select",[["","—"],["abierta","Abierta"],["en_curso","En curso"],["cerrada","Cerrada"]]);
+    const r4=h("div",{"class":"row3"});fs2.appendChild(r4);const fS2=field(r4,"S después",f.s2,"select",ESC),fO2=field(r4,"O después",f.o2,"select",ESC),fD2=field(r4,"D después",f.d2,"select",ESC);const live2=h("div",{"class":"nprlive"});r4.appendChild(live2);
+    const fOr=field(b,"Origen (quién lo propuso)",f.origen);
+    const upd=()=>{const t={s:+fS.value,o:+fO.value,d:+fD.value,s2:+fS2.value,o2:+fO2.value,d2:+fD2.value};const v=npr(t),v2=npr2(t);
+      live.innerHTML="";live.appendChild(document.createTextNode("NPR: "));const s=h("span",{"class":"npr"},v===""?"—":String(v));s.style.background=color(v);live.appendChild(s);
+      live2.innerHTML="";live2.appendChild(document.createTextNode("NPR después: "));const s2=h("span",{"class":"npr"},v2===""?"—":String(v2));s2.style.background=color(v2);live2.appendChild(s2);};
+    [fS,fO,fD,fS2,fO2,fD2].forEach(x=>x.addEventListener("change",upd));upd();
+    if(!isNew){btn("Borrar","del",()=>{D.filas=D.filas.filter(x=>x!==f);save();dlg.close();renderAll();});btn("Duplicar","",()=>{const c=clone(f);c.id=uid("f");D.filas.splice(D.filas.indexOf(f)+1,0,c);save();openFila(c);renderAll();});}
+    btn("Cancelar","",()=>dlg.close());
+    btn("Guardar","pri",()=>{if(!fM.value.trim()){fM.focus();return;}
+      Object.assign(f,{paso:fP.value,modo:fM.value.trim(),efecto:fE.value.trim(),causa:fC.value.trim(),causaRef:cks.filter(i=>i.checked).map(i=>i.value),s:fS.value,o:fO.value,d:fD.value,
+        prevencion:fPr.value.trim(),deteccion:fDe.value.trim(),accion:fA.value.trim(),responsable:fR.value.trim(),plazo:fPl.value.trim(),estadoAccion:fEs.value||(fA.value.trim()?"abierta":""),s2:fS2.value,o2:fO2.value,d2:fD2.value,origen:fOr.value.trim()});
+      if(isNew)D.filas.push(f);save();dlg.close();renderAll();});}
+  function openPlan(k){const isNew=!k;
+    if(!editing()&&!isNew){const b=dlgOpen(k.caracteristica||"Plan de control");
+      readOnly(b,[["Paso",pasoTxt(k.paso)],["Tipo",CTL[k.tipo]],["Método y referencia",k.metodo||"¿?"],["Criterio",k.criterio||"¿?"],["Frecuencia",k.frecuencia||"¿?"],["Registro",k.registro],["Plan de reacción",k.reaccion||"¿?"],["Responsable",k.responsable]]);
+      btn("Editar","",()=>{setEdit(true);openPlan(k);});btn("Cerrar","pri",()=>dlg.close());return;}
+    k=k||{id:uid("k"),paso:(D.pasos[0]||{}).id||"",caracteristica:"",tipo:"verificacion",metodo:"",criterio:"",frecuencia:D.doc.plan==="prototipo"?"Cada pieza":"",registro:"Hoja de ruta del lote",reaccion:"",responsable:""};
+    const b=dlgOpen(isNew?"Nueva fila del plan de control":"Editar plan de control");
+    const fP=field(b,"Paso",k.paso,"select",D.pasos.map((p,i)=>[p.id,(i+1)+" · "+p.texto]));const fC=field(b,"Característica",k.caracteristica);
+    const fT=field(b,"Tipo de control",k.tipo,"select",Object.keys(CTL).map(x=>[x,CTL[x]]));const fM=field(b,"Método y referencia",k.metodo,"area");
+    const r=h("div",{"class":"row2"});b.appendChild(r);const fCr=field(r,"Criterio de aceptación",k.criterio),fF=field(r,"Tamaño y frecuencia de muestra",k.frecuencia);
+    const r2=h("div",{"class":"row2"});b.appendChild(r2);const fR=field(r2,"Registro",k.registro),fRs=field(r2,"Responsable",k.responsable);const fRe=field(b,"Plan de reacción",k.reaccion,"area");
+    if(!isNew)btn("Borrar","del",()=>{D.plan=D.plan.filter(x=>x!==k);save();dlg.close();renderAll();});
+    btn("Cancelar","",()=>dlg.close());
+    btn("Guardar","pri",()=>{if(!fC.value.trim()){fC.focus();return;}Object.assign(k,{paso:fP.value,caracteristica:fC.value.trim(),tipo:fT.value,metodo:fM.value.trim(),criterio:fCr.value.trim(),frecuencia:fF.value.trim(),registro:fR.value.trim(),responsable:fRs.value.trim(),reaccion:fRe.value.trim()});
+      if(isNew)D.plan.push(k);save();dlg.close();renderAll();});}
+  function openPasos(){const b=dlgOpen("Pasos analizados");b.appendChild(h("p",{"class":"hint",style:"margin:0"},"Lo habitual es importarlos de la ruta de fabricación (herramienta Flujo del proyecto). También se pueden agregar pasos generales, como «Todos los pasos» o «Sala»."));
+    const list=h("div",{style:"display:grid;gap:6px"});b.appendChild(list);
+    const draw=()=>{list.innerHTML="";D.pasos.forEach((p,i)=>{const r=h("div",{style:"display:grid;grid-template-columns:28px 1fr 130px 30px;gap:6px;align-items:center"});
+      r.appendChild(h("span",{"class":"hint"},String(i+1)));const t=h("input",{type:"text"});t.value=p.texto;t.addEventListener("change",()=>{p.texto=t.value.trim();});
+      const a=h("input",{type:"text",placeholder:"acrónimo"});a.value=p.acr||"";a.addEventListener("change",()=>{p.acr=a.value.trim();});
+      const x=h("button",{type:"button",title:"Quitar"},"×");x.addEventListener("click",()=>{if(D.filas.some(f=>f.paso===p.id)&&!confirm("Este paso tiene filas. ¿Quitarlo igual? Las filas quedan sin paso."))return;D.pasos.splice(i,1);draw();});
+      [t,a,x].forEach(e=>r.appendChild(e));list.appendChild(r);});};draw();
+    btn("+ Paso","",()=>{D.pasos.push({id:uid("p"),texto:"Paso nuevo",acr:""});draw();});btn("Guardar","pri",()=>{save();dlg.close();renderAll();});}
+  function msg(t,x){const b=dlgOpen(t);b.appendChild(h("p",{style:"margin:0;white-space:pre-line"},x));btn("Cerrar","pri",()=>dlg.close());}
+
+  // ---------------------------------------------------------------- importar y exportar
+  function parseCSV(t){t=t.replace(/^\uFEFF/,"");const first=t.split(/\r?\n/)[0]||"";const sep=(first.split(";").length>first.split(",").length)?";":",";const rows=[];let row=[],cell="",q=false;
+    for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell="";}
+      else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}else cell+=ch;}
+    if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.join("").trim());}
+  function fromFlujo(o){const R=o.rutas||[];if(!R.length)throw new Error("El flujo no tiene rutas de fabricación.");
+    const go=r=>{D.pasos=r.pasos.map(p=>({id:p.id,texto:p.texto,acr:p.acr||""}));
+      D.plan=r.pasos.filter(p=>p.control).map(p=>({id:uid("k"),paso:p.id,caracteristica:p.control.que||"",tipo:p.control.tipo||"verificacion",metodo:p.control.referencia||"",criterio:p.control.criterio||"",
+        frecuencia:r.escala==="laboratorio"?"Cada pieza":"",registro:"Hoja de ruta del lote",reaccion:p.control.reaccion||"",responsable:""}));
+      D.filas.forEach(f=>{if(!D.pasos.some(p=>p.id===f.paso)){const m=D.pasos.find(p=>norm(p.texto)===norm(pasoTxt(f.paso).replace(/^\d+ · /,"")));if(m)f.paso=m.id;}});
+      if(!D.doc.alcance)D.doc.alcance="Ruta "+r.id+" · "+r.nombre;D.doc.plan=r.escala==="laboratorio"?"prototipo":D.doc.plan;
+      save();dlg.close();renderAll();msg("Pasos importados","Se tomaron "+D.pasos.length+" pasos y "+D.plan.length+" filas del plan de control de la ruta "+r.id+". Ahora falta lo que la ruta no sabe: qué puede fallar en cada paso, por qué y con qué gravedad.");};
+    if(R.length===1)return go(R[0]);const b=dlgOpen("¿Qué ruta?");const f=field(b,"Ruta de fabricación",R[0].id,"select",R.map(r=>[r.id,r.id+" · "+r.nombre]));btn("Cancelar","",()=>dlg.close());btn("Importar","pri",()=>go(R.find(r=>r.id===f.value)));}
+  function fromIshikawa(o){D.causas=o.causas.map(c=>({id:c.id,m:c.m,texto:c.texto,estado:c.estado}));save();renderAll();
+    msg("Causas importadas","Se tomaron "+D.causas.length+" causas del Ishikawa «"+((o.doc&&o.doc.titulo)||"")+"». Al editar una fila podés marcar a qué causas responde; la lista de preguntas muestra las que todavía no están en ninguna fila.");}
+  function fromCSV(t){const rows=parseCSV(t);const hd=rows.shift().map(x=>norm(x));const ix=k=>hd.findIndex(x=>x.includes(k));
+    if(ix("modo de falla")<0)throw new Error("No encontré la columna «Modo de falla».");const ip=ix("paso"),ia=ix("acronimo"),idt=ix("deteccion");
+    rows.forEach(r=>{const txt=(r[ip]||"").trim();if(!txt)return;let p=D.pasos.find(x=>norm(x.texto)===norm(txt));if(!p){p={id:uid("p"),texto:txt,acr:ia>=0?(r[ia]||"").trim():""};D.pasos.push(p);}
+      const modo=(r[ix("modo de falla")]||"").trim();if(modo||idt>=0)D.filas.push({id:uid("f"),paso:p.id,modo,efecto:(r[ix("efecto")]||"").trim(),s:"",causa:(r[ix("causa")]||"").trim(),causaRef:[],o:"",prevencion:"",deteccion:idt>=0?(r[idt]||"").trim():"",d:"",accion:"",responsable:"",plazo:"",estadoAccion:"",s2:"",o2:"",d2:"",origen:"Esqueleto"});});
+    save();renderAll();msg("Esqueleto importado","Ahora hay "+D.pasos.length+" pasos. Las filas nuevas tienen el control actual del paso; falta el modo de falla, el efecto, la causa y los puntajes.");}
+  $("f-imp").addEventListener("change",function(){const file=this.files[0];if(!file)return;const rd=new FileReader();
+    rd.onload=()=>{try{if(/\.csv$/i.test(file.name))return fromCSV(rd.result);const o=JSON.parse(rd.result);
+      if(o.filas&&o.pasos){D=o;normalize();save();renderAll();return;}
+      if(o.rutas&&o.nodos)return fromFlujo(o);
+      if(o.causas&&o.doc&&("efecto" in o.doc))return fromIshikawa(o);
+      throw new Error("No reconozco el archivo: no es un AMFE, ni un flujo del proyecto, ni un Ishikawa.");}
+      catch(e){msg("No se pudo importar","Revisá el archivo: "+e.message);}};rd.readAsText(file,"utf-8");this.value="";});
+  function download(name,text,type){const a=h("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  const csvCell=v=>{v=String(v==null?"":v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const csv=rows=>"\uFEFF"+rows.map(r=>r.map(csvCell).join(";")).join("\n");
+  const slug=()=>(D.doc.codigo||"amfe").replace(/[^A-Za-z0-9._-]+/g,"_");
+  const AMFE_H=["Paso","Acrónimo","Modo de falla","Efecto","S","Causa","Causas del Ishikawa","O","Prevención actual","Detección actual","D","NPR","Acción","Responsable","Plazo","Estado","S después","O después","D después","NPR después","Origen"];
+  const amfeRow=f=>{const p=pasoDe(f.paso)||{};return[pasoTxt(f.paso),p.acr||"",f.modo,f.efecto,f.s,f.causa,f.causaRef.join(", "),f.o,f.prevencion,f.deteccion,f.d,npr(f),f.accion,f.responsable,f.plazo,EST[f.estadoAccion]||"",f.s2,f.o2,f.d2,npr2(f),f.origen];};
+  const PLAN_H=["Paso","Característica","Tipo","Método y referencia","Criterio","Frecuencia","Registro","Plan de reacción","Responsable"];
+  const planRow=k=>[pasoTxt(k.paso),k.caracteristica,CTL[k.tipo]||"",k.metodo,k.criterio,k.frecuencia,k.registro,k.reaccion,k.responsable];
+  function md(H,rows){const e=s=>String(s==null?"":s).replace(/\|/g,"\\|").replace(/\n/g," ");return "| "+H.join(" | ")+" |\n|"+H.map(()=>"---").join("|")+"|\n"+rows.map(r=>"| "+r.map(e).join(" | ")+" |").join("\n")+"\n";}
+  $("sel-exp").addEventListener("change",function(){const v=this.value;this.value="";
+    if(v==="json")download(slug()+".json",JSON.stringify(D,null,1),"application/json");
+    if(v==="amfe")download(slug()+"_AMFE.csv",csv([AMFE_H].concat(D.filas.map(amfeRow))),"text/csv");
+    if(v==="plan")download(slug()+"_Plan-de-control.csv",csv([PLAN_H].concat(D.plan.map(planRow))),"text/csv");
+    if(v==="md")download(slug()+".md","# "+(D.doc.titulo||"AMFE")+"\n\n*"+(D.doc.codigo||"")+" v"+(D.doc.version||"")+" · "+(D.doc.fecha||"")+" · Elaboró: "+(D.doc.elaboro||"")+" · Semáforo: "+(D.doc.semaforo||"")+"*\n\nAlcance: "+(D.doc.alcance||"")+". Umbral: NPR ≥ "+D.doc.umbralNPR+" o S ≥ "+D.doc.umbralS+".\n\n## AMFE de proceso\n\n"+md(AMFE_H,D.filas.map(amfeRow))+"\n## Plan de control "+PLAN[D.doc.plan]+"\n\n"+md(PLAN_H,D.plan.map(planRow)),"text/markdown");});
+
+  // ---------------------------------------------------------------- impresión y edición del documento
+  const PAPEL={A4:[297,210],A3:[420,297]};
+  function applyPaper(){const d=D.doc,s=SEMA[d.semaforo]||SEMA.rojo,box="font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;";
+    $("papel").textContent="@page{size:"+pref.papel+" landscape;margin:10mm 10mm 10mm 20mm;"+
+      "@top-left{content:"+cssStr((d.codigo||"")+" · AMFE de proceso DiDe · "+(d.titulo||""))+";"+box+"}"+
+      "@top-right{content:"+cssStr("Versión "+(d.version||"")+" · "+(d.fecha||""))+";"+box+"}"+
+      "@bottom-left{content:"+cssStr("Elaboró: "+(d.elaboro||"")+" · Semáforo: "+(d.semaforo||"")+" — "+s.d)+";"+box+"}"+
+      "@bottom-right{content:\"Página \" counter(page) \" de \" counter(pages);"+box+"}}";$("sel-papel").value=pref.papel;}
+  function bindDocFields(){document.querySelectorAll("[data-f]").forEach(e=>{if(e._b)return;e._b=true;e.contentEditable=editing()?"true":"false";
+    e.addEventListener("input",()=>{const k=e.dataset.f;D.doc[k]=(k==="umbralNPR"||k==="umbralS")?(+e.textContent||D.doc[k]):e.textContent;save();
+      document.querySelectorAll('[data-f="'+k+'"]').forEach(o=>{if(o!==e)o.textContent=e.textContent;});applyPaper();if(k.startsWith("umbral")){renderAMFE();renderAcc();renderPreguntas();renderSintesis();}});});}
+  $("sema-sel").addEventListener("change",function(){D.doc.semaforo=this.value;save();renderDoc();});
+  $("b-edit").addEventListener("click",()=>setEdit(!editing()));
+  $("b-add").addEventListener("click",()=>openFila(null));$("b-add-plan").addEventListener("click",()=>openPlan(null));$("b-pasos").addEventListener("click",openPasos);
+  ["fl-paso","fl-alto","fl-orden"].forEach(id=>$(id).addEventListener("change",()=>{renderAMFE();}));
+  $("d-x").addEventListener("click",()=>dlg.close());
+  $("b-print").addEventListener("click",()=>{document.body.classList.add("print-all");window.print();});
+  $("b-print-v").addEventListener("click",()=>{document.body.classList.remove("print-all");window.print();});
+  window.addEventListener("afterprint",()=>document.body.classList.remove("print-all"));
+  $("sel-papel").addEventListener("change",function(){pref.papel=this.value;savePref();applyPaper();});
+  $("b-reset").addEventListener("click",()=>{const b=dlgOpen("Volver a los datos del archivo");b.appendChild(h("p",{style:"margin:0"},"Se pierden los cambios guardados en este navegador. Exportá un JSON antes si los querés conservar."));
+    btn("Cancelar","",()=>dlg.close());btn("Volver a los datos","del",()=>{try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);normalize();celda=null;dlg.close();renderAll();});});
+
+  if(location.hash==="#todo")document.body.classList.add("print-all");else if(location.hash.length>1)view=decodeURIComponent(location.hash.slice(1));
+  load();renderAll();
+})();
+</script>
+</body>
+</html>

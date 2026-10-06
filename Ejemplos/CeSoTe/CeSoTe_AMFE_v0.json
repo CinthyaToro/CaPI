@@ -1,0 +1,798 @@
+{
+ "doc": {
+  "codigo": "CeSoTe-AMFE-01",
+  "version": "0.1",
+  "fecha": "2026-10-05",
+  "estado": "Ejercicio · borrador",
+  "semaforo": "verde",
+  "titulo": "CeSoTe · AMFE de proceso de la ruta base (DP-02)",
+  "alcance": "Ruta DP-02 · Ruta base Al-BSF, escala de laboratorio, más la espera entre pasos y el ambiente de la sala",
+  "elaboro": "J (jefa del grupo) con E, R, F y Q",
+  "reviso": "—",
+  "aprobo": "—",
+  "autores": "E, R, F, Q, J (perfiles ficticios)",
+  "origen": "Ejercicio CaPI con perfiles ficticios. Pasos: CeSoTe_FlujoProyecto_v0 (DP-02). Causas: CeSoTe-ISH-01. Filas y plan: CeSoTe_AMFE-Proceso_v0.md.",
+  "umbralNPR": 150,
+  "umbralS": 9,
+  "plan": "prototipo"
+ },
+ "pasos": [
+  {
+   "id": "T",
+   "texto": "Todos los pasos",
+   "acr": ""
+  },
+  {
+   "id": "s00",
+   "texto": "Identificación de wafers y apertura de la hoja de ruta",
+   "acr": ""
+  },
+  {
+   "id": "s01",
+   "texto": "Recepción e inspección de wafers",
+   "acr": ""
+  },
+  {
+   "id": "s02",
+   "texto": "Limpieza y texturizado",
+   "acr": ""
+  },
+  {
+   "id": "E34",
+   "texto": "Espera entre la limpieza y la difusión",
+   "acr": ""
+  },
+  {
+   "id": "s03",
+   "texto": "Difusión del emisor",
+   "acr": ""
+  },
+  {
+   "id": "s04",
+   "texto": "Remoción del vidrio de fósforo y aislamiento de bordes",
+   "acr": ""
+  },
+  {
+   "id": "s05",
+   "texto": "Antirreflejo (SiNx)",
+   "acr": ""
+  },
+  {
+   "id": "s06",
+   "texto": "Contacto trasero de aluminio y aleado",
+   "acr": ""
+  },
+  {
+   "id": "s07",
+   "texto": "Contacto frontal: fotolitografía, evaporación y lift-off",
+   "acr": ""
+  },
+  {
+   "id": "s08",
+   "texto": "Recocido de contactos",
+   "acr": ""
+  },
+  {
+   "id": "s09",
+   "texto": "Definición del área de la celda",
+   "acr": ""
+  },
+  {
+   "id": "s10",
+   "texto": "Medición I-V y eficiencia cuántica externa",
+   "acr": ""
+  },
+  {
+   "id": "S",
+   "texto": "Sala limpia (ambiente)",
+   "acr": ""
+  }
+ ],
+ "causas": [
+  {
+   "id": "c01",
+   "m": "Método",
+   "texto": "No hay hoja de ruta por wafer",
+   "estado": "no_dominada"
+  },
+  {
+   "id": "c02",
+   "m": "Método",
+   "texto": "Recetas no escritas: cada corrida se ajusta a ojo",
+   "estado": "no_dominada"
+  },
+  {
+   "id": "c03",
+   "m": "Método",
+   "texto": "Ventana de difusión no determinada (DP-02 paso 3)",
+   "estado": "variable"
+  },
+  {
+   "id": "c04",
+   "m": "Método",
+   "texto": "Perfil de recocido de contactos sin fijar (DP-02 paso 8)",
+   "estado": "variable"
+  },
+  {
+   "id": "c05",
+   "m": "Método",
+   "texto": "No está acordado qué es una celda buena (¿eficiencia, FF, Voc?)",
+   "estado": "no_dominada"
+  },
+  {
+   "id": "c06",
+   "m": "Máquina",
+   "texto": "Perfil de temperatura del horno de difusión no caracterizado",
+   "estado": "sin_evaluar"
+  },
+  {
+   "id": "c07",
+   "m": "Máquina",
+   "texto": "El espesor evaporado depende de la posición en el portamuestras",
+   "estado": "variable"
+  },
+  {
+   "id": "c08",
+   "m": "Máquina",
+   "texto": "Deriva de la lámpara del simulador entre sesiones",
+   "estado": "variable"
+  },
+  {
+   "id": "c09",
+   "m": "Materiales",
+   "texto": "Wafers de distintos lotes del proveedor",
+   "estado": "variable"
+  },
+  {
+   "id": "c10",
+   "m": "Materiales",
+   "texto": "Calidad del agua y de los químicos de limpieza",
+   "estado": "sin_evaluar"
+  },
+  {
+   "id": "c11",
+   "m": "Materiales",
+   "texto": "Estado del dopante líquido (fecha de apertura, humedad)",
+   "estado": "sin_evaluar"
+  },
+  {
+   "id": "c12",
+   "m": "Medición",
+   "texto": "Celda de referencia sin calibración trazable vigente",
+   "estado": "no_dominada"
+  },
+  {
+   "id": "c13",
+   "m": "Medición",
+   "texto": "Incertidumbre de la medición I-V no declarada",
+   "estado": "no_dominada"
+  },
+  {
+   "id": "c14",
+   "m": "Medición",
+   "texto": "El área de la celda se mide con distinto criterio",
+   "estado": "variable"
+  },
+  {
+   "id": "c15",
+   "m": "Medición",
+   "texto": "Temperatura de la celda durante la medición no controlada",
+   "estado": "variable"
+  },
+  {
+   "id": "c16",
+   "m": "Mano de obra",
+   "texto": "Cada doctorando opera distinto",
+   "estado": "variable"
+  },
+  {
+   "id": "c17",
+   "m": "Mano de obra",
+   "texto": "Tiempo de espera entre pasos no registrado",
+   "estado": "sin_evaluar"
+  },
+  {
+   "id": "c18",
+   "m": "Medio ambiente",
+   "texto": "Partículas y humedad de la sala limpia sin monitorear",
+   "estado": "sin_evaluar"
+  },
+  {
+   "id": "c19",
+   "m": "Medio ambiente",
+   "texto": "Bancos húmedos compartidos con otros grupos",
+   "estado": "sin_evaluar"
+  }
+ ],
+ "filas": [
+  {
+   "id": "f01",
+   "paso": "T",
+   "modo": "Un paso se ejecuta sin especificación escrita",
+   "efecto": "La corrida no se puede repetir ni comparar",
+   "s": 7,
+   "causa": "Recetas no escritas",
+   "causaRef": [
+    "c02"
+   ],
+   "o": 8,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 5,
+   "accion": "A2 · Especificación provisoria de cada paso (SOP v0), aunque la ventana todavía no esté fijada",
+   "responsable": "Q",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f02",
+   "paso": "T",
+   "modo": "Cada operador hace el paso distinto",
+   "efecto": "Dispersión entre lotes que no se puede explicar",
+   "s": 6,
+   "causa": "Operador",
+   "causaRef": [
+    "c16"
+   ],
+   "o": 6,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 6,
+   "accion": "A4 · Registrar quién operó cada paso; formación por paso para doctorandos",
+   "responsable": "J",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f03",
+   "paso": "s00",
+   "modo": "Wafer sin código o con la hoja de ruta incompleta",
+   "efecto": "Sus datos no sirven para calificar",
+   "s": 8,
+   "causa": "Sin hoja de ruta",
+   "causaRef": [
+    "c01"
+   ],
+   "o": 7,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 4,
+   "accion": "A3 · Hoja de ruta obligatoria desde el lote 1; ningún wafer avanza sin el registro del paso anterior",
+   "responsable": "J",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f04",
+   "paso": "s01",
+   "modo": "Entra un wafer fuera de especificación",
+   "efecto": "Baja eficiencia atribuida al proceso",
+   "s": 6,
+   "causa": "Lotes distintos del proveedor",
+   "causaRef": [
+    "c09"
+   ],
+   "o": 5,
+   "prevencion": "",
+   "deteccion": "Certificado del proveedor",
+   "d": 3,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f05",
+   "paso": "s02",
+   "modo": "Contaminación metálica residual",
+   "efecto": "Baja el tiempo de vida y la Voc",
+   "s": 7,
+   "causa": "Agua y químicos; bancos compartidos",
+   "causaRef": [
+    "c10",
+    "c19"
+   ],
+   "o": 5,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 6,
+   "accion": "A5 · Registrar la resistividad del agua en cada corrida; bancos exclusivos o registro de uso",
+   "responsable": "E",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f06",
+   "paso": "s02",
+   "modo": "Textura no uniforme",
+   "efecto": "Reflectancia alta, baja Isc",
+   "s": 5,
+   "causa": "Ventana no fijada",
+   "causaRef": [],
+   "o": 6,
+   "prevencion": "",
+   "deteccion": "Reflectancia",
+   "d": 3,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f07",
+   "paso": "E34",
+   "modo": "Espera larga entre la limpieza y la difusión",
+   "efecto": "Superficie contaminada u oxidada antes de difundir",
+   "s": 6,
+   "causa": "Tiempo de espera no registrado",
+   "causaRef": [
+    "c17"
+   ],
+   "o": 5,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 7,
+   "accion": "A6 · Registrar la hora de salida y de entrada entre pasos; fijar una espera máxima",
+   "responsable": "Q",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f08",
+   "paso": "s03",
+   "modo": "Resistencia de lámina fuera de ventana",
+   "efecto": "Baja FF o Voc",
+   "s": 7,
+   "causa": "Ventana no determinada; perfil del horno; dopante",
+   "causaRef": [
+    "c03",
+    "c06",
+    "c11"
+   ],
+   "o": 7,
+   "prevencion": "",
+   "deteccion": "4 puntas en cada wafer",
+   "d": 3,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f09",
+   "paso": "s04",
+   "modo": "Aislamiento incompleto",
+   "efecto": "Resistencia en paralelo baja, baja FF",
+   "s": 6,
+   "causa": "Criterio no objetivo",
+   "causaRef": [],
+   "o": 4,
+   "prevencion": "",
+   "deteccion": "Hidrofobicidad",
+   "d": 5,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f10",
+   "paso": "s05",
+   "modo": "Espesor o índice fuera de ventana",
+   "efecto": "Reflectancia alta",
+   "s": 5,
+   "causa": "Ventana no fijada",
+   "causaRef": [],
+   "o": 5,
+   "prevencion": "",
+   "deteccion": "Elipsometría",
+   "d": 2,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f11",
+   "paso": "s06",
+   "modo": "Aleado no uniforme",
+   "efecto": "Resistencia serie alta",
+   "s": 6,
+   "causa": "Ventana no fijada",
+   "causaRef": [],
+   "o": 4,
+   "prevencion": "",
+   "deteccion": "Visual",
+   "d": 5,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f12",
+   "paso": "s07",
+   "modo": "Espesor de dedos distinto según la posición",
+   "efecto": "Resistencia serie, baja FF",
+   "s": 6,
+   "causa": "Posición en el portamuestras",
+   "causaRef": [
+    "c07"
+   ],
+   "o": 6,
+   "prevencion": "",
+   "deteccion": "Perfilómetro sobre testigos",
+   "d": 4,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f13",
+   "paso": "s07",
+   "modo": "Lift-off incompleto",
+   "efecto": "Cortocircuito: celda inservible",
+   "s": 8,
+   "causa": "Proceso de lift-off",
+   "causaRef": [],
+   "o": 3,
+   "prevencion": "",
+   "deteccion": "Microscopio",
+   "d": 3,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f14",
+   "paso": "s08",
+   "modo": "Perfil térmico distinto del programado",
+   "efecto": "Contacto pobre o perforación del emisor",
+   "s": 7,
+   "causa": "Perfil sin fijar; horno sin calibrar",
+   "causaRef": [
+    "c04"
+   ],
+   "o": 6,
+   "prevencion": "",
+   "deteccion": "Termocupla (sin calibrar)",
+   "d": 4,
+   "accion": "A8 · Calibrar la termocupla de perfil; lote dividido de recocido con wafer testigo",
+   "responsable": "Q",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f15",
+   "paso": "s09",
+   "modo": "Área medida con distinto criterio",
+   "efecto": "Eficiencia informada errónea",
+   "s": 8,
+   "causa": "Criterio de área",
+   "causaRef": [
+    "c14"
+   ],
+   "o": 4,
+   "prevencion": "",
+   "deteccion": "Patrón de medida",
+   "d": 3,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f16",
+   "paso": "s10",
+   "modo": "Incertidumbre de medición no declarada",
+   "efecto": "No se puede decidir R2: no se sabe si varía el proceso o la medición",
+   "s": 8,
+   "causa": "Incertidumbre no declarada",
+   "causaRef": [
+    "c13"
+   ],
+   "o": 8,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 8,
+   "accion": "A1 · Estudio de repetibilidad y reproducibilidad de la medición I-V antes del lote 1; declarar la incertidumbre",
+   "responsable": "F",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f17",
+   "paso": "s10",
+   "modo": "Referencia sin calibración trazable vigente",
+   "efecto": "Toda la eficiencia informada queda sin respaldo",
+   "s": 9,
+   "causa": "Calibración vencida o ausente",
+   "causaRef": [
+    "c12"
+   ],
+   "o": 5,
+   "prevencion": "",
+   "deteccion": "Certificado",
+   "d": 4,
+   "accion": "A7 · Certificado vigente de la celda de referencia; celda testigo en cada sesión",
+   "responsable": "F",
+   "plazo": "",
+   "estadoAccion": "abierta",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f18",
+   "paso": "s10",
+   "modo": "Deriva de la lámpara o temperatura no controlada",
+   "efecto": "Variación de medición confundida con variación de proceso",
+   "s": 8,
+   "causa": "Lámpara; temperatura de la celda",
+   "causaRef": [
+    "c08",
+    "c15"
+   ],
+   "o": 6,
+   "prevencion": "",
+   "deteccion": "Celda testigo en cada sesión",
+   "d": 3,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  },
+  {
+   "id": "f19",
+   "paso": "S",
+   "modo": "Partículas o humedad fuera de clase",
+   "efecto": "Defectos y dispersión",
+   "s": 5,
+   "causa": "Sin monitoreo",
+   "causaRef": [
+    "c18"
+   ],
+   "o": 4,
+   "prevencion": "",
+   "deteccion": "",
+   "d": 7,
+   "accion": "",
+   "responsable": "",
+   "plazo": "",
+   "estadoAccion": "",
+   "s2": "",
+   "o2": "",
+   "d2": "",
+   "origen": "J"
+  }
+ ],
+ "plan": [
+  {
+   "id": "k00",
+   "paso": "s00",
+   "caracteristica": "Código y hoja de ruta",
+   "tipo": "verificacion",
+   "metodo": "Registro de la línea",
+   "criterio": "100 %",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "No entra a la ruta",
+   "responsable": "J"
+  },
+  {
+   "id": "k01",
+   "paso": "s01",
+   "caracteristica": "Resistividad y espesor",
+   "tipo": "verificacion",
+   "metodo": "Certificado + muestra propia",
+   "criterio": "Especificación de insumos",
+   "frecuencia": "Cada lote de compra",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Rechazar el lote",
+   "responsable": ""
+  },
+  {
+   "id": "k02",
+   "paso": "s02",
+   "caracteristica": "Resistividad del agua (A5)",
+   "tipo": "verificacion",
+   "metodo": "Resistivímetro calibrado",
+   "criterio": "",
+   "frecuencia": "Cada corrida",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Detener la limpieza",
+   "responsable": "E"
+  },
+  {
+   "id": "k03",
+   "paso": "s02",
+   "caracteristica": "Reflectancia",
+   "tipo": "verificacion",
+   "metodo": "Patrón de reflectancia calibrado",
+   "criterio": "",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Retexturizar o descartar",
+   "responsable": ""
+  },
+  {
+   "id": "k34",
+   "paso": "E34",
+   "caracteristica": "Tiempo de espera (A6)",
+   "tipo": "verificacion",
+   "metodo": "Reloj de la hoja de ruta",
+   "criterio": "",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Repetir la limpieza",
+   "responsable": "Q"
+  },
+  {
+   "id": "k04",
+   "paso": "s03",
+   "caracteristica": "Resistencia de lámina",
+   "tipo": "verificacion",
+   "metodo": "4 puntas; oblea patrón",
+   "criterio": "",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Wafer en espera; análisis de causa",
+   "responsable": ""
+  },
+  {
+   "id": "k05",
+   "paso": "s04",
+   "caracteristica": "Remoción y aislamiento",
+   "tipo": "verificacion",
+   "metodo": "Hidrofobicidad; fotos patrón",
+   "criterio": "Criterio escrito",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Repetir el paso",
+   "responsable": ""
+  },
+  {
+   "id": "k06",
+   "paso": "s05",
+   "caracteristica": "Espesor e índice",
+   "tipo": "verificacion",
+   "metodo": "Elipsometría; muestra conocida",
+   "criterio": "",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Reprocesar",
+   "responsable": ""
+  },
+  {
+   "id": "k07",
+   "paso": "s06",
+   "caracteristica": "Uniformidad del aleado",
+   "tipo": "verificacion",
+   "metodo": "Criterio escrito; estructura de prueba",
+   "criterio": "",
+   "frecuencia": "Cada wafer",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Descartar",
+   "responsable": ""
+  },
+  {
+   "id": "k08",
+   "paso": "s07",
+   "caracteristica": "Ancho y espesor de dedos",
+   "tipo": "verificacion",
+   "metodo": "Microscopio y perfilómetro calibrados",
+   "criterio": "",
+   "frecuencia": "Cada wafer y posición",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Reprocesar",
+   "responsable": ""
+  },
+  {
+   "id": "k09",
+   "paso": "s08",
+   "caracteristica": "Perfil térmico",
+   "tipo": "calibracion",
+   "metodo": "Termocupla de perfil calibrada (A8)",
+   "criterio": "",
+   "frecuencia": "Cada corrida",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Ajustar el perfil",
+   "responsable": "Q"
+  },
+  {
+   "id": "k10",
+   "paso": "s09",
+   "caracteristica": "Área",
+   "tipo": "verificacion",
+   "metodo": "Patrón de medida",
+   "criterio": "± tolerancia de la especificación",
+   "frecuencia": "Cada celda",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Recalcular la eficiencia",
+   "responsable": ""
+  },
+  {
+   "id": "k11",
+   "paso": "s10",
+   "caracteristica": "I-V y eficiencia",
+   "tipo": "validacion",
+   "metodo": "Simulador clasificado; referencia trazable; celda testigo (A1, A7)",
+   "criterio": "La testigo da su valor dentro de la incertidumbre declarada",
+   "frecuencia": "Cada celda; testigo en cada sesión",
+   "registro": "Hoja de ruta del lote",
+   "reaccion": "Detener y recalibrar",
+   "responsable": "F"
+  }
+ ]
+}
