@@ -18,7 +18,7 @@ desde el primer lote como si fuéramos a calificar. Ver
 
 | # | Paso | Pregunta que responde | Material |
 |---|---|---|---|
-| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Herramienta](Herramientas/DiDe_Concepto.html) · Formularios de Google para copiar: [Etapa 1 · La Idea](https://docs.google.com/forms/d/19tbqAdXX9Kbkxx6k5Oa_JnHK6bzSiiM1TavCsKjxzfM/copy) y [Etapa 2 · El Proyecto](https://docs.google.com/forms/d/1o1z7jOD_13NU2b6XQJDX63CS0jZ7yjWllJntHC1AVS0/copy) · [Script](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
+| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Herramienta](Herramientas/DiDe_Concepto.html) · [Formularios de Google (script)](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
 | 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Herramienta](Herramientas/DiDe_A3.html) · [Guía](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
 | 3 | Flujo del proyecto | ¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación? | [Herramienta](Herramientas/DiDe_FlujoProyecto.html) |
 | 4 | Ishikawa 6M | ¿Qué hay que controlar para que el resultado se repita? | [Herramienta](Herramientas/DiDe_Ishikawa.html) |
@@ -42,9 +42,9 @@ pueda copiar la respuesta.
 
 ## Cómo usar las plantillas y las herramientas
 
-1. Empezá por la encuesta de Concepto, de una de tres formas: en la herramienta Concepto (en el navegador; descarga
-   CSV y Word), con tu copia de los formularios de Google (para que respondan tus clientes o tu equipo), o generándolos
-   con el script. Las tres terminan en el mismo CSV. Respondé cada pregunta mirando el ejemplo.
+1. Empezá por la encuesta de Concepto: en la herramienta Concepto (en el navegador; descarga CSV y Word) o con
+   formularios de Google en tu cuenta, que crea el script (para que respondan tus clientes o tu equipo). Las dos
+   terminan en el mismo CSV. Respondé cada pregunta mirando el ejemplo. En papel: la plantilla.
 2. En la herramienta A3, «Importar» prellena las nueve cajas con ese CSV; después se destila en reunión. Al terminar,
    «Exportar .md» lo deja listo para el paso siguiente («Exportar .json» sirve para volver a abrirlo).
 3. Abrí la herramienta de flujo del proyecto. Con "Esqueleto desde Concepto y A3" arma un primer borrador por reglas,
