@@ -56,13 +56,18 @@ pueda copiar la respuesta.
 Lo que produce cada grupo es **suyo y confidencial**: no lo subas a un repositorio público hasta saber qué partes
 conviene proteger. Las herramientas guardan los datos sólo en tu navegador.
 
+## Cómo citar
+
+Toro, C. (2026). *CaPI y DiDe: plantillas y herramientas para documentar proyectos de I+D y distinguir lo
+protegible* (v0.1) [Software]. Zenodo. https://doi.org/10.5281/zenodo.23195753
+
 ## Autoría
 
-CaPI y DiDe, con sus plantillas y herramientas, son desarrollos de **Cinthya Toro**, Laboratorio de FotoFísica Láser
-(LFFL), CITEDEF, Argentina. Las herramientas se desarrollaron con asistencia de IA (Claude); la autora definió el
+CaPI y DiDe, con sus plantillas y herramientas, son desarrollos de **Cinthya Toro**, Línea de trabajo de Foto Física
+Láser (LFFL), CITEDEF, Argentina. Las herramientas se desarrollaron con asistencia de IA (Claude); la autora definió el
 método, revisó y aprobó cada versión.
 
-Perfil: [github.com/CinthyaToro](https://github.com/CinthyaToro)
+ORCID: [0000-0002-5509-3000](https://orcid.org/0000-0002-5509-3000) · Perfil: [github.com/CinthyaToro](https://github.com/CinthyaToro)
 
 **Licencia:** en definición. Todos los derechos reservados: para reutilizar o adaptar este material, consultar a la
 autora.

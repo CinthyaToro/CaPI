@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "Si usás este material, citalo así."
+title: "CaPI y DiDe: plantillas y herramientas para documentar proyectos de I+D y distinguir lo protegible"
+type: software
+authors:
+  - family-names: Toro
+    given-names: Cinthya
+    orcid: "https://orcid.org/0000-0002-5509-3000"
+    affiliation: "Línea de trabajo de Foto Física Láser (LFFL), CITEDEF, Argentina"
+version: v0.1
+doi: 10.5281/zenodo.23195753
+date-released: 2026-10-06
+repository-code: "https://github.com/CinthyaToro/CaPI"
+url: "https://cinthyatoro.github.io/CaPI/"
+keywords:
+  - propiedad intelectual
+  - transferencia de tecnología
+  - documentación de proyectos de I+D
+  - DiDe
+  - CaPI
+  - A3
+  - Ishikawa
+  - AMFE
+  - WBS
+  - BIMi
