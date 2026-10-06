@@ -298,7 +298,7 @@
 
 <script>
 (function(){
-  var KEY='a3-capi-v0.2';
+  var KEY='a3-cesote-v0.1';
   var page=document.getElementById('page');
   function g(id){var x=document.getElementById(id);return x?x.textContent.trim():'';}
   function sync(){
@@ -374,6 +374,20 @@
     }
   });
 })();
+/* EXTRA-INICIO */
+(function(){
+  function t(sel){var e=document.querySelector(sel);return e?e.textContent.trim():'';}
+  function q(s){return '"'+String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')+'"';}
+  var st=document.createElement('style');document.head.appendChild(st);
+  var box='font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;';
+  function paginar(){
+    st.textContent='@page{@top-left{content:'+q(t('#f-codigo')+' · '+t('#f-titulo'))+';'+box+'}'+
+      '@top-right{content:'+q('Versión '+t('#f-version')+' · Emisión '+t('#f-fecha'))+';'+box+'}'+
+      '@bottom-left{content:'+q('Elaboró: '+t('#f-autor')+' · Carácter: '+t('[data-ph="Carácter"]'))+';'+box+'}}';
+  }
+  paginar();window.addEventListener('beforeprint',paginar);document.addEventListener('input',paginar);
+})();
+/* EXTRA-FIN */
 </script>
 </body>
 </html>

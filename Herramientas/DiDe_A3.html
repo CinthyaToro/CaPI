@@ -117,9 +117,10 @@
 <body>
 
 <div class="toolbar no-print">
-  <strong>A3 en construcción</strong>
-  <span class="hint">Hoja 1: carátula · Hoja 2: lienzo. Hacé clic en cualquier texto para editarlo; se guarda solo en este navegador.</span>
+  <strong>Herramienta A3 DiDe</strong>
+  <span class="hint">Trae de ejemplo el A3 de SincLE. Tocá «Empezar uno en blanco» para el tuyo; hacé clic en cualquier texto para editarlo; se guarda solo en este navegador.</span>
   <span class="grow"></span>
+  <button type="button" id="btn-blank">Empezar uno en blanco</button>
   <button type="button" id="btn-print">Imprimir / Guardar PDF</button>
   <button type="button" id="btn-save">Descargar mi versión (.html)</button>
   <button type="button" id="btn-reset" class="ghost">Volver al borrador</button>
@@ -298,7 +299,7 @@
 
 <script>
 (function(){
-  var KEY='a3-sincle-v0.1';
+  var KEY='a3-herramienta-v0.1';
   var page=document.getElementById('page');
   function g(id){var x=document.getElementById(id);return x?x.textContent.trim():'';}
   function sync(){
@@ -387,6 +388,15 @@
   }
   paginar();window.addEventListener('beforeprint',paginar);document.addEventListener('input',paginar);
 })();
+
+document.getElementById('btn-blank').addEventListener('click',function(){
+  if(!confirm('Se borra el ejemplo de esta computadora y queda el A3 vacío para tu proyecto. ¿Seguro?'))return;
+  document.querySelectorAll('.body').forEach(function(b){b.innerHTML='';});
+  document.querySelectorAll('.f[contenteditable]').forEach(function(f){f.textContent='';});
+  var fe=document.getElementById('f-fecha');if(fe){fe.textContent=new Date().toISOString().slice(0,10);}
+  var v=document.getElementById('f-version');if(v){v.textContent='0.1';}
+  var b=document.querySelector('.body');if(b){b.dispatchEvent(new Event('input',{bubbles:true}));}
+});
 /* EXTRA-FIN */
 </script>
 </body>
