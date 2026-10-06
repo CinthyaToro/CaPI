@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WBS y Diccionario DiDe</title>
+<!--
+  HERRAMIENTA "WBS CONSTRUCTIBLE Y DICCIONARIO" DiDe — v0.1 (05/10/2026) — Cinthya Toro · CaPI / DiDe
+  Un solo archivo, sin dependencias. Pasos de la ruta DiDe:
+    Concepto → A3 → Flujo del proyecto (→ Ruta de fabricación) → Ishikawa → AMFE y plan de control → WBS → Diccionario → BIM
+
+  WBS constructible (plantillas CaPI-Universal 03 y 04): cada globito responde QUÉ (función abstracta, invariante) y
+  CÓMO (mecanismo concreto, contingente). El CÓMO de un nivel se vuelve el QUÉ del siguiente. Regla del 100 %: los QUÉ
+  de los hijos suman el CÓMO del padre, ni más ni menos. Los IF no van en la WBS. Convención α para los acrónimos:
+  tres letras minúsculas (consonantes primero), punto entre niveles; la raíz es libre. El Diccionario es la tabla
+  de todos los globitos: la fuente de verdad del proyecto.
+
+  Importar (se reconoce solo): .json de esta herramienta; .json de la herramienta Flujo del proyecto (arma el árbol
+  con las etapas, los elementos y las rutas de fabricación; las decisiones y revisiones quedan afuera); .csv del
+  Diccionario (acrónimo;nivel;padre;nombre;qué;cómo;descomponible).
+
+  FORMATO JSON
+  { "doc":   { codigo, version, fecha, estado, semaforo, titulo, elaboro, reviso, aprobo, autores, origen },
+    "nodos": [ { id, acr, padre (id; vacío sólo en la raíz), nombre, que, como, descomponible (si|no|""),
+                 tipo (proceso|entrada|validacion|documento), critico (true|false), pi (publico|secreto|patente|sin_definir),
+                 idef0: { entradas, salidas, controles, mecanismos }, vmodel: { criterio, kpi, test }, doc, origen } ] }
+
+  Impresión: A4 apaisado (A3 a pedido), márgenes ISO 5457, encabezado y pie con "Página n de N" (Chrome o Edge 131+).
+  …html#todo prepara la impresión completa; #dic, #regla, #fichas abren vistas.
+-->
+<style>
+  :root{color-scheme:light;
+    --ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--muted:#615d54;--line:#cfc9b8;--teal:#1f6b62;--warn:#b58500;--nd:#b3261e;--ok:#2e7d32;--hl:#fffbe8;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif)}
+  button,select,input,textarea{font:inherit}
+  .bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 18px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:13px}
+  .bar .grow{flex:1}
+  .bar button,.bar label.btn,.bar select{font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .bar button.ghost{background:transparent;color:#fff}
+  .bar button[aria-pressed="true"]{background:#ffd37a;border-color:#ffd37a}
+  .bar input[type=file]{display:none}
+  .page{max-width:1600px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .headdoc{background:var(--paper);border:1px solid var(--ink);padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+  .head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0 0 3px}
+  h1{font-size:23px;line-height:1.2;margin:0}
+  [data-f]{outline:none;border-radius:3px}
+  body.edit [data-f]{background:var(--hl);border-bottom:1px dotted var(--teal)}
+  .sema{border:2px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px;min-width:230px;font-family:var(--sans)}
+  .ctrl{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--ink);font-size:13px}
+  .ctrl div{padding:5px 8px;border-right:1px solid var(--ink);min-width:0}.ctrl div:last-child{border-right:0}
+  .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:-1px}
+  .hint{color:var(--muted);font-size:12.5px;font-family:var(--sans)}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--sans);font-size:13.5px}
+  .tabs button{border:1px solid var(--ink);background:var(--paper);border-radius:5px 5px 0 0;padding:6px 12px;cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+  .tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--sans);font-size:13px}
+  .tools select{border:1px solid var(--line);border-radius:4px;padding:4px 8px;background:var(--paper)}
+  .leg{display:inline-flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .leg i{display:inline-block;width:16px;height:11px;border:1.5px solid;vertical-align:-1px;margin-right:3px}
+
+  .view{display:none;background:var(--paper);border:1px solid var(--ink);padding:14px 18px}
+  .view.current{display:block}
+  .view h2{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
+  .diagram{border:1px solid var(--line);border-radius:5px;overflow:auto;background:#fff}
+  .diagram svg{display:block}
+  svg text{font-family:var(--sans)}
+  .g{cursor:pointer}.g:focus{outline:none}.g:hover rect,.g:focus rect{stroke-width:2.6}
+  .conn{fill:none;stroke:#77736a;stroke-width:1.3}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--sans)}
+  th,td{text-align:left;vertical-align:top;padding:4px 6px;border:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);background:#faf8f2}
+  td.falta{color:var(--warn);font-weight:600}
+  td.acr{font-family:var(--mono);white-space:nowrap}
+  tbody tr{cursor:pointer}tbody tr:hover{background:var(--hl)}
+  .regla{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:0 0 8px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;font-family:var(--sans);font-size:13px}
+  .regla h3{grid-column:1/-1;margin:0;font-size:14px}
+  .regla.mal{border-color:var(--warn);background:#fffaf0}.regla.bien{border-color:var(--ok)}
+  .regla ol{margin:0;padding-left:20px}
+  .ficha{border:1px solid var(--ink);border-radius:6px;padding:8px 10px;margin:0 0 10px;font-family:var(--sans);font-size:13px;break-inside:avoid}
+  .ficha h3{margin:0 0 6px;font-size:14px}
+  .ficha table{font-size:12.5px}
+
+  .below{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px}
+  .box{background:var(--paper);border:1px solid var(--ink);border-radius:5px;padding:10px 13px;font-size:14px;line-height:1.45;min-width:0;font-family:var(--sans)}
+  .box h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px;color:var(--teal)}
+  .box ol{margin:0;padding-left:20px}.box li{margin:3px 0}.box li a{color:var(--ink);text-decoration:underline dotted}.box p{margin:0 0 6px}
+  .rotulo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1.5px solid var(--ink);font-size:11.5px;font-family:var(--sans);margin-bottom:10px}
+  .rotulo div{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:3px 6px;min-width:0}
+  .rotulo div:nth-child(4n){border-right:0}.rotulo div:nth-last-child(-n+4){border-bottom:0}.rotulo .wide{grid-column:span 3}
+  .print-only{display:none}
+
+  dialog{border:1px solid var(--ink);border-radius:8px;padding:0;max-width:720px;width:95vw;font-family:var(--sans)}
+  dialog::backdrop{background:rgba(20,18,14,.45)}
+  .dlg-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .dlg-h h3{margin:0;font-size:17px;line-height:1.3}
+  .dlg-b{padding:12px 16px;display:grid;gap:9px;font-size:14px;max-height:70vh;overflow:auto}
+  .dlg-b label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+  .dlg-b input,.dlg-b select,.dlg-b textarea{border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--ink);font-size:14px;width:100%}
+  .dlg-b fieldset{border:1px solid var(--line);border-radius:6px;display:grid;gap:8px;padding:8px 10px}
+  .dlg-b legend{font-size:12px;color:var(--teal);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .dlg-f{padding:10px 16px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+  .dlg-f button{padding:6px 12px;border-radius:4px;border:1px solid var(--ink);background:#fff;cursor:pointer}
+  .dlg-f button.pri{background:var(--ink);color:#fff}
+  .dlg-f button.del{border-color:var(--nd);color:var(--nd);margin-right:auto}
+  .ro p{margin:0}.ro .k{margin-bottom:2px}
+  .only-edit{display:none!important} body.edit .only-edit{display:inline-block!important}
+  .tip{position:fixed;z-index:20;pointer-events:none;max-width:360px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:12.5px;line-height:1.4;padding:7px 9px;border-radius:5px;display:none}
+
+  @media print{
+    body{background:#fff}
+    .bar,.headdoc,.tabs,.tools,.below,dialog,.tip,.no-print{display:none!important}
+    .print-only{display:grid}
+    .page{display:block;padding:0;max-width:none}
+    .view{display:none!important;border:0;padding:0}
+    body.print-all .view,.view.current{display:block!important}
+    .view{break-before:page}
+    .view[data-view="arbol"] .diagram{border:0;overflow:visible}
+    .view[data-view="arbol"] svg{width:100%!important;height:auto!important;max-height:150mm}
+    table{font-size:8.5pt}th{font-size:7pt}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="papel"></style>
+</head>
+<body>
+<div class="bar">
+  <strong>WBS y Diccionario DiDe</strong>
+  <button type="button" id="b-edit" aria-pressed="false">Editar</button>
+  <button type="button" id="b-add" class="only-edit">+ Globito</button>
+  <span class="grow"></span>
+  <label class="btn" for="f-imp">Importar</label><input type="file" id="f-imp" accept=".json,.csv">
+  <select id="sel-exp" aria-label="Exportar">
+    <option value="">Exportar…</option>
+    <option value="json">Datos (.json)</option>
+    <option value="dic">Diccionario (.md)</option>
+    <option value="csv">Diccionario (.csv)</option>
+    <option value="mmd">Diagrama Mermaid (.mmd)</option>
+    <option value="wbs">Árbol en texto (.md)</option>
+  </select>
+  <label>Papel <select id="sel-papel" aria-label="Tamaño de papel"><option value="A4">A4</option><option value="A3">A3</option></select></label>
+  <button type="button" id="b-print">Imprimir todo</button>
+  <button type="button" id="b-print-v">Imprimir esta vista</button>
+  <button type="button" id="b-reset" class="ghost">Volver a los datos del archivo</button>
+</div>
+
+<main class="page">
+  <section class="headdoc" aria-label="Control documental">
+    <div class="head">
+      <div><p class="kicker">DiDe — WBS constructible y Diccionario</p><h1 data-f="titulo"></h1></div>
+      <div class="sema" id="sema"><span class="k">Semáforo</span><span class="dot" id="sema-dot"></span> <b id="sema-txt"></b>
+        <select id="sema-sel" class="only-edit" aria-label="Color del semáforo"><option value="rojo">rojo</option><option value="amarillo">amarillo</option><option value="verde">verde</option></select>
+        <br><span id="sema-desc" class="hint"></span></div>
+    </div>
+    <div class="ctrl">
+      <div><span class="k">Código</span><span data-f="codigo"></span></div>
+      <div><span class="k">Versión · estado</span><span data-f="version"></span> · <span data-f="estado"></span></div>
+      <div><span class="k">Autores</span><span data-f="autores"></span></div>
+      <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+      <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+      <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+    </div>
+    <p class="hint" style="margin:0">Origen: <span data-f="origen"></span></p>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Vistas"></nav>
+  <div class="tools">
+    <label>Mostrar hasta el nivel <select id="fl-niv"><option value="9">todos</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+    <span class="leg">
+      <span><i style="background:#EEEDFE;border-color:#534AB7"></i>raíz</span>
+      <span><i style="background:#FAECE7;border-color:#993C1D"></i>proceso</span>
+      <span><i style="background:#fff;border-color:#1b1a16"></i>entrada / requisito</span>
+      <span><i style="background:#FAEEDA;border-color:#854F0B"></i>validación / medición</span>
+      <span><i style="background:#eef3fb;border-color:#1e5aa8"></i>documento</span>
+      <span><i style="background:#fff;border:2px dashed #b58500"></i>falta QUÉ o CÓMO</span>
+      <span class="hint">borde grueso = paquete de trabajo terminal</span>
+    </span>
+  </div>
+
+  <section class="view" data-view="arbol" aria-label="Árbol WBS">
+    <div class="rotulo print-only" data-rot="WBS constructible (árbol)"></div>
+    <h2>WBS constructible</h2>
+    <div class="diagram"><svg id="svg" role="img" aria-label="Árbol WBS"></svg></div>
+  </section>
+  <section class="view" data-view="dic" aria-label="Diccionario">
+    <div class="rotulo print-only" data-rot="Diccionario de la WBS"></div>
+    <h2>Diccionario de la WBS (fuente de verdad)</h2>
+    <table><thead><tr><th>Acrónimo</th><th>Nivel</th><th>Padre</th><th>Nombre completo</th><th>QUÉ</th><th>CÓMO</th><th>Descomp.</th><th>PI</th><th>Origen</th></tr></thead><tbody id="t-dic"></tbody></table>
+  </section>
+  <section class="view" data-view="regla" aria-label="Regla del 100 %">
+    <div class="rotulo print-only" data-rot="Regla del 100 %"></div>
+    <h2>Regla del 100 %: los QUÉ de los hijos suman el CÓMO del padre</h2>
+    <p class="hint">La herramienta cuenta las acciones del CÓMO (separadas por →, +, ; o líneas) y las compara con la cantidad de hijos. Es un control aproximado: la decisión es del equipo.</p>
+    <div id="regla"></div>
+  </section>
+  <section class="view" data-view="fichas" aria-label="Fichas extendidas">
+    <div class="rotulo print-only" data-rot="Fichas de globitos críticos (IDEF0 y V-Model)"></div>
+    <h2>Fichas de los globitos críticos (IDEF0 y V-Model)</h2>
+    <div id="fichas"></div>
+  </section>
+
+  <div class="below"><div class="box" id="preguntas"></div><div class="box" id="sintesis"></div></div>
+</main>
+
+<template id="tpl-rot">
+  <div class="wide"><span class="k">Título</span><span data-f="titulo"></span></div>
+  <div><span class="k">Código</span><b data-f="codigo"></b></div>
+  <div class="wide"><span class="k">Documento</span><span class="rot-diag"></span></div>
+  <div><span class="k">Semáforo</span><span class="sema-name"></span></div>
+  <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+  <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+  <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+  <div><span class="k">Versión · fecha</span><span data-f="version"></span> · <span data-f="fecha"></span></div>
+</template>
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <div class="dlg-h"><h3 id="dlg-t"></h3><button type="button" id="d-x" aria-label="Cerrar" style="border:0;background:none;font-size:20px;cursor:pointer">×</button></div>
+  <div class="dlg-b" id="dlg-b"></div><div class="dlg-f" id="dlg-f"></div>
+</dialog>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<!-- DATOS: ejemplo ReDi de las plantillas CaPI-Universal 03 y 04 (público; los valores numéricos son inventados). -->
+<script id="datos" type="application/json">
+{
+ "doc": {"codigo": "ReDi-WBS-01", "version": "0.1", "fecha": "2026-10-05", "estado": "Ejemplo", "semaforo": "verde",
+  "titulo": "ReDi · Red de Difracción", "elaboro": "Cinthya Toro", "reviso": "—", "aprobo": "—", "autores": "Cinthya Toro",
+  "origen": "Ejemplo de las plantillas CaPI-Universal 03 (guía WBS constructible) y 04 (Diccionario). Los valores numéricos son inventados: sólo muestran el nivel de detalle esperado."},
+ "nodos": [
+  {"id": "r0", "acr": "ReDi", "padre": "", "nombre": "Red de Difracción", "que": "Producir dispositivo óptico que difracta luz en patrones controlados", "como": "Diseñar patrón → seleccionar sustrato → preparar resina → depositar → transferir → inspeccionar", "descomponible": "si", "tipo": "proceso"},
+  {"id": "r1", "acr": "dsñ", "padre": "r0", "nombre": "Diseño del patrón", "que": "Definir el patrón de líneas a transferir al sustrato", "como": "Diseño digital → iteración versión n → exportar negativo final", "descomponible": "si", "tipo": "proceso"},
+  {"id": "r2", "acr": "str", "padre": "r0", "nombre": "Elección de sustrato", "que": "Elegir el material base del dispositivo", "como": "Comparar Si rígido vs mylar flexible según criterios de aplicación", "descomponible": "no", "tipo": "entrada"},
+  {"id": "r3", "acr": "ers", "padre": "r0", "nombre": "Elección de resina", "que": "Elegir y preparar la resina fotosensible", "como": "Resina + solvente + dilución según espesor objetivo", "descomponible": "no", "tipo": "entrada"},
+  {"id": "r4", "acr": "drs", "padre": "r0", "nombre": "Depósito de resina", "que": "Aplicar capa uniforme de resina sobre sustrato", "como": "Spin coating + control rpm/tiempo + medición espesor", "descomponible": "si", "tipo": "proceso"},
+  {"id": "r5", "acr": "tpl", "padre": "r0", "nombre": "Transferencia del patrón", "que": "Trasladar el patrón al sustrato con resina", "como": "Exposición + revelado + lavado", "descomponible": "si", "tipo": "proceso"},
+  {"id": "r6", "acr": "isp", "padre": "r0", "nombre": "Inspección", "que": "Validar resultado de cada etapa crítica", "como": "Inspección óptica y medición de cada etapa crítica + registro en planilla", "descomponible": "si", "tipo": "validacion"},
+  {"id": "r41", "acr": "drs.prp", "padre": "r4", "nombre": "Preparar solución de resina", "que": "Obtener resina lista para depositar", "como": "Diluir SU-8 2050 con ciclopentanona 1:1, agitar, dejar reposar", "descomponible": "no", "tipo": "proceso"},
+  {"id": "r42", "acr": "drs.cal", "padre": "r4", "nombre": "Calibrar spin coater", "que": "Asegurar 3000 ± 30 rpm reproducible antes de cada serie", "como": "Medir con tacómetro óptico, ajustar potenciómetro, repetir hasta 3 mediciones en rango", "descomponible": "no", "tipo": "validacion", "critico": true,
+   "idef0": {"entradas": "Spin coater; tacómetro óptico", "salidas": "Equipo calibrado y registro", "controles": "Procedimiento de calibración", "mecanismos": "Técnico del laboratorio"},
+   "vmodel": {"criterio": "3 mediciones seguidas dentro de 3000 ± 30 rpm", "kpi": "rpm medidas", "test": "Tacómetro óptico calibrado"}},
+  {"id": "r43", "acr": "drs.dep", "padre": "r4", "nombre": "Ejecutar depósito", "que": "Aplicar capa uniforme con parámetros calibrados", "como": "Pipetear 200 μL, spin 3000 rpm × 30 s, soft bake 65 °C × 5 min", "descomponible": "no", "tipo": "proceso"},
+  {"id": "r44", "acr": "drs.med", "padre": "r4", "nombre": "Medir espesor", "que": "Verificar 2.0 ± 0.1 μm", "como": "Perfilómetro en 5 puntos, registro en planilla con firma", "descomponible": "no", "tipo": "validacion"}
+ ]
+}
+</script>
+
+<script>
+(function(){
+  "use strict";
+  const PI={publico:"Público",secreto:"Secreto",patente:"Candidato a patente",sin_definir:"Sin definir"};
+  const TIPO={proceso:"Proceso",entrada:"Entrada / requisito",validacion:"Validación / medición",documento:"Documento"};
+  const COL={raiz:["#EEEDFE","#534AB7"],proceso:["#FAECE7","#993C1D"],entrada:["#ffffff","#1b1a16"],validacion:["#FAEEDA","#854F0B"],documento:["#eef3fb","#1e5aa8"]};
+  const SEMA={rojo:{h:"#b3261e",d:"Sólo autores y capacitadora."},amarillo:{h:"#b58500",d:"Todo el grupo."},verde:{h:"#2e7d32",d:"Público."}};
+  const STOP=new Set("de del la las el los y e en con para por a al un una unos unas que se su sus o u lo le les mas más sin entre sobre desde hasta como cada otro otra este esta estos estas ruta".split(" "));
+  const NS="http://www.w3.org/2000/svg";
+  const ORIG=JSON.parse(document.getElementById("datos").textContent);
+  let D,KEY,view="arbol";const $=id=>document.getElementById(id);
+  let pref={papel:"A4"};try{const p=JSON.parse(localStorage.getItem("dide-wbs-pref")||"null");if(p)pref=Object.assign(pref,p);}catch(e){}
+  const savePref=()=>{try{localStorage.setItem("dide-wbs-pref",JSON.stringify(pref));}catch(e){}};
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  function load(){KEY="dide-wbs-"+(ORIG.doc.codigo||"x");D=clone(ORIG);try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s);}catch(e){}normalize();}
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}};
+  let seq=Date.now();const uid=p=>p+(seq++).toString(36);
+  const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  const trunc=(s,n)=>(s=String(s||""),s.length>n?s.slice(0,n-1)+"…":s);
+  const cssStr=s=>'"'+String(s||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/[\r\n]+/g," ")+'"';
+  function h(tag,a,txt){const e=document.createElement(tag);if(a)for(const k in a){if(k==="class")e.className=a[k];else e.setAttribute(k,a[k]);}if(txt!=null)e.textContent=txt;return e;}
+  function svgEl(tag,a,txt){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+  function wrap(s,n){const w=String(s||"").split(/\s+/).filter(Boolean),out=[];let cur="";w.forEach(x=>{if((cur+" "+x).trim().length>n){if(cur)out.push(cur);cur=x;}else cur=(cur+" "+x).trim();});if(cur)out.push(cur);return out.length?out:[""];}
+
+  // ---------------------------------------------------------------- árbol
+  const byId=id=>D.nodos.find(n=>n.id===id);
+  const raiz=()=>D.nodos.find(n=>!n.padre)||D.nodos[0];
+  const kids=id=>D.nodos.filter(n=>n.padre===id);
+  function nivel(n){let d=0,p=n;const seen=new Set();while(p&&p.padre&&!seen.has(p.id)){seen.add(p.id);p=byId(p.padre);d++;}return d;}
+  function dfs(){const out=[];const r=raiz();if(!r)return out;const seen=new Set();const v=(n,d)=>{if(seen.has(n.id))return;seen.add(n.id);out.push({n,d});kids(n.id).forEach(k=>v(k,d+1));};v(r,0);
+    D.nodos.forEach(n=>{if(!seen.has(n.id))v(n,nivel(n));});return out;}
+  function normalize(){D.doc=D.doc||{};D.nodos=D.nodos||[];
+    D.nodos.forEach(n=>{n.padre=n.padre||"";n.tipo=TIPO[n.tipo]?n.tipo:"proceso";n.descomponible=n.descomponible==="si"||n.descomponible==="no"?n.descomponible:"";n.pi=PI[n.pi]?n.pi:"sin_definir";
+      n.idef0=n.idef0||{};n.vmodel=n.vmodel||{};n.critico=!!n.critico;});fillAcr();}
+
+  // convención α
+  const VOC=new Set("aeiou".split(""));
+  function propose(text,prefix,used){const words=norm(text).replace(/[^a-z0-9ñ ]/g," ").split(/\s+/).filter(w=>w&&!STOP.has(w));const c=[];
+    words.forEach((w,wi)=>{const cs=w.split("").filter(ch=>/[a-zñ]/.test(ch)&&!VOC.has(ch));if(cs.length>=3){c.push(cs[0]+cs[1]+cs[2]);for(let i=3;i<cs.length;i++){c.push(cs[0]+cs[1]+cs[i]);c.push(cs[0]+cs[2]+cs[i]);}}
+      if(wi===0&&words[1]){const c2=words[1].split("").filter(ch=>/[a-zñ]/.test(ch)&&!VOC.has(ch));if(cs.length&&c2.length>=2)c.push(cs[0]+c2[0]+c2[1]);}});
+    const pre=prefix?prefix+".":"";for(const x of c)if(!used.has(pre+x))return pre+x;
+    let base=(words.join("").replace(/[^a-zñ]/g,"")+"xxx").slice(0,3),a=pre+base,i=2;while(used.has(a)){a=pre+base.slice(0,2)+i;i++;}return a;}
+  function fillAcr(){const used=new Set(D.nodos.filter(n=>n.acr).map(n=>n.acr));const r=raiz();
+    dfs().forEach(({n})=>{if(n.acr)return;if(n===r){n.acr=(D.doc.acronimo||"PRY");used.add(n.acr);return;}
+      const p=byId(n.padre);const pre=(!p||p===r)?"":p.acr;n.acr=propose(n.nombre,pre,used);n.acrPropuesto=true;used.add(n.acr);});}
+  function acrValido(n){const r=raiz();if(n===r)return true;const p=byId(n.padre);const segs=n.acr.split(".");const last=segs[segs.length-1];
+    if(!/^[a-zñ]{3}$/.test(last))return false;const pre=(!p||p===r)?"":p.acr;return pre?n.acr===pre+"."+last:segs.length===1;}
+
+  // ---------------------------------------------------------------- reglas
+  const items=como=>String(como||"").split(/\s*(?:→|->|\+|;|\n)\s*/).map(s=>s.trim()).filter(Boolean);
+  function regla(n){const ks=kids(n.id);if(!ks.length)return null;const k=items(n.como).length;return{n,ks,k,ok:k===ks.length};}
+  const R_IF=/(^|[\s,(])(si|if|en caso de|cuando falla)\s/;  // sin /i: «Si» con mayúscula suele ser silicio
+  function preguntas(){const Q=[],L=dfs(),acrs={};D.nodos.forEach(n=>{acrs[n.acr]=(acrs[n.acr]||0)+1;});
+    L.forEach(({n})=>{const nm="«"+n.acr+" · "+trunc(n.nombre,40)+"»",r={id:n.id};
+      if(!n.que)Q.push({t:nm+": ¿QUÉ logra? (función abstracta, 1 o 2 líneas)",r});
+      if(!n.como)Q.push({t:nm+": ¿CÓMO lo logra? (mecanismo concreto, 1 a 3 líneas)",r});
+      if(!n.descomponible)Q.push({t:nm+": ¿se puede descomponer más? Se detiene cuando un técnico puede ejecutar el CÓMO con un SOP sin preguntar nada más.",r});
+      if(n.descomponible==="si"&&!kids(n.id).length)Q.push({t:nm+" se puede descomponer, pero todavía no tiene hijos.",r});
+      if(n.descomponible==="no"&&kids(n.id).length)Q.push({t:nm+" está marcado como terminal pero tiene hijos.",r});
+      if(n.descomponible==="no"&&(String(n.como).length>260||items(n.como).length>5))Q.push({t:nm+" es terminal pero su CÓMO es largo: ¿un técnico puede ejecutarlo con un SOP? Si no, descomponelo.",r});
+      if(R_IF.test(" "+n.como+" "))Q.push({t:nm+": el CÓMO tiene un «si…». Los IF no van en la WBS: llevalo al flujo del proyecto como decisión, o dejalo dentro del CÓMO si es un reintento normal.",r});
+      if(!acrValido(n))Q.push({t:nm+": el acrónimo no sigue la convención α (tres letras, con el prefijo del padre).",r});
+      if(acrs[n.acr]>1)Q.push({t:nm+": el acrónimo está repetido.",r});
+      if(n.critico&&!(n.idef0.entradas||n.idef0.salidas||n.idef0.controles||n.idef0.mecanismos))Q.push({t:nm+" es crítico: completá su ficha IDEF0 (entradas, salidas, controles, mecanismos).",r});
+      if(n.critico&&!n.vmodel.criterio)Q.push({t:nm+" es crítico: ¿cuál es su criterio de aceptación (V-Model)?",r});
+      if(n.critico&&n.pi==="sin_definir")Q.push({t:nm+" es crítico: ¿es público, secreto o candidato a patente?",r});});
+    const prop=L.filter(x=>x.n.acrPropuesto);if(prop.length)Q.push({t:"La herramienta propuso "+prop.length+" acrónimos ("+prop.slice(0,6).map(x=>x.n.acr).join(", ")+(prop.length>6?"…":"")+"): revisalos en el Diccionario y confirmalos o cambialos.",r:{id:prop[0].n.id},v:"dic"});
+    L.forEach(({n})=>{const g=regla(n);if(g&&!g.ok&&g.k)Q.push({t:"Regla del 100 %: el CÓMO de «"+n.acr+"» tiene "+g.k+" acciones y "+g.ks.length+" hijos: ¿falta o sobra alguno?",r:{id:n.id},v:"regla"});});
+    return Q;}
+
+  // ---------------------------------------------------------------- vistas
+  function renderArbol(){const svg=$("svg");svg.innerHTML="";const max=+$("fl-niv").value;const r=raiz();if(!r)return;
+    const BW=230,GX=46,FS=12,LH=14.5,P=14;const pos={};let cur=P;
+    const place=(n,d)=>{const ls=wrap(n.nombre,Math.floor((BW-16)/(FS*0.54))).slice(0,3);const hh=ls.length*LH+30;
+      const ks=d<max?kids(n.id):[];let y;
+      if(ks.length){const start=cur;ks.forEach(k=>place(k,d+1));const a=pos[ks[0].id],b=pos[ks[ks.length-1].id];y=(a.y+a.hh/2+b.y+b.hh/2)/2-hh/2;
+        if(y<start)y=start;if(y+hh>cur)cur=y+hh+12;}
+      else{y=cur;cur+=hh+12;}
+      pos[n.id]={x:P+d*(BW+GX),y,hh,ls,d};};
+    place(r,0);
+    const gC=svgEl("g",{}),gN=svgEl("g",{});svg.appendChild(gC);svg.appendChild(gN);let W=0;
+    Object.keys(pos).forEach(id=>{const n=byId(id),p=pos[id];W=Math.max(W,p.x+BW);
+      if(n.padre&&pos[n.padre]){const q=pos[n.padre],mx=q.x+BW+GX/2;gC.appendChild(svgEl("path",{d:"M"+(q.x+BW)+" "+(q.y+q.hh/2)+"H"+mx+"V"+(p.y+p.hh/2)+"H"+p.x,"class":"conn"}));}
+      const g=svgEl("g",{"class":"g",tabindex:0,role:"button","aria-label":n.acr+": "+n.nombre});const c=COL[n===r?"raiz":n.tipo];const falta=!n.que||!n.como;
+      const rc=svgEl("rect",{x:p.x,y:p.y,width:BW,height:p.hh,rx:6,fill:c[0],stroke:falta?"#b58500":c[1],"stroke-width":n.descomponible==="no"?2.6:1.4});if(falta)rc.setAttribute("stroke-dasharray","5 3");g.appendChild(rc);
+      g.appendChild(svgEl("text",{x:p.x+8,y:p.y+15,"font-size":11.5,"font-weight":700,fill:c[1],"font-family":"Consolas,monospace"},n.acr+(kids(n.id).length&&p.d>=max?"  ▸ "+kids(n.id).length:"")));
+      const t=svgEl("text",{x:p.x+8,y:p.y+31,"font-size":FS,fill:"#1b1a16"});p.ls.forEach((l,i)=>t.appendChild(svgEl("tspan",{x:p.x+8,dy:i?LH:0},l)));g.appendChild(t);
+      if(n.critico)g.appendChild(svgEl("text",{x:p.x+BW-8,y:p.y+15,"font-size":11,"text-anchor":"end",fill:"#b3261e"},"crítico"));
+      g.addEventListener("click",()=>openNodo(n));g.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();openNodo(n);}});
+      g.addEventListener("mousemove",ev=>tip(n,ev));g.addEventListener("mouseleave",()=>{$("tip").style.display="none";});gN.appendChild(g);});
+    const H=cur+P;W+=P;svg.setAttribute("viewBox","0 0 "+W+" "+H);svg.setAttribute("width",W);svg.setAttribute("height",H);}
+  function tip(n,ev){const t=$("tip");t.innerHTML="";t.appendChild(h("b",null,n.acr+" · "+n.nombre));const add=s=>{t.appendChild(h("br"));t.appendChild(document.createTextNode(s));};
+    add("QUÉ: "+(n.que||"¿?"));add("CÓMO: "+(n.como||"¿?"));if(n.origen)add("Origen: "+n.origen);t.style.display="block";t.style.left=Math.min(ev.clientX+14,innerWidth-370)+"px";t.style.top=(ev.clientY+14)+"px";}
+  function td(tr,v,cls){const c=h("td",cls?{"class":cls}:null,v==null?"":String(v));tr.appendChild(c);return c;}
+  function renderDic(){const tb=$("t-dic");tb.innerHTML="";const max=+$("fl-niv").value;
+    dfs().forEach(({n,d})=>{if(d>max)return;const tr=h("tr");const p=byId(n.padre);td(tr,n.acr,"acr");td(tr,d);td(tr,p?p.acr:"—","acr");td(tr,n.nombre);
+      td(tr,n.que||"¿?",!n.que&&"falta");td(tr,n.como||"¿?",!n.como&&"falta");td(tr,n.descomponible==="si"?"Sí":n.descomponible==="no"?"No":"¿?",!n.descomponible&&"falta");td(tr,n.pi==="sin_definir"?"":PI[n.pi]);td(tr,n.origen||"");
+      tr.addEventListener("click",()=>openNodo(n));tb.appendChild(tr);});}
+  function renderRegla(){const box=$("regla");box.innerHTML="";dfs().forEach(({n})=>{const g=regla(n);if(!g)return;
+    const d=h("div",{"class":"regla "+(g.ok?"bien":"mal")});d.appendChild(h("h3",null,n.acr+" · "+n.nombre+" — "+(g.ok?"cumple (":"revisar (")+g.k+" acciones en el CÓMO, "+g.ks.length+" hijos)"));
+    const a=h("div");a.appendChild(h("span",{"class":"k"},"CÓMO del padre"));const ol=h("ol");items(n.como).forEach(x=>ol.appendChild(h("li",null,x)));if(!ol.children.length)ol.appendChild(h("li",null,"¿?"));a.appendChild(ol);
+    const b=h("div");b.appendChild(h("span",{"class":"k"},"QUÉ de los hijos"));const ol2=h("ol");g.ks.forEach(k=>ol2.appendChild(h("li",null,k.acr+": "+(k.que||"¿?"))));b.appendChild(ol2);
+    d.appendChild(a);d.appendChild(b);d.addEventListener("click",()=>openNodo(n));box.appendChild(d);});
+    if(!box.children.length)box.appendChild(h("p",{"class":"hint"},"Todavía no hay globitos con hijos."));}
+  function renderFichas(){const box=$("fichas");box.innerHTML="";const C=dfs().filter(x=>x.n.critico);
+    if(!C.length){box.appendChild(h("p",{"class":"hint"},"No hay globitos marcados como críticos. Un globito es crítico si es patentable, regulatorio o define la calidad del resultado."));return;}
+    C.forEach(({n})=>{const f=h("div",{"class":"ficha"});f.appendChild(h("h3",null,n.acr+" · "+n.nombre));
+      const t=h("table");const add=(k,v)=>{const tr=h("tr");tr.appendChild(h("th",{style:"width:24%"},k));const c=h("td",null,v||"¿?");if(!v)c.className="falta";tr.appendChild(c);t.appendChild(tr);};
+      add("QUÉ",n.que);add("CÓMO",n.como);add("IDEF0 · entradas",n.idef0.entradas);add("IDEF0 · salidas",n.idef0.salidas);add("IDEF0 · controles",n.idef0.controles);add("IDEF0 · mecanismos",n.idef0.mecanismos);
+      add("V-Model · criterio de aceptación",n.vmodel.criterio);add("V-Model · KPI",n.vmodel.kpi);add("V-Model · test",n.vmodel.test);add("Propiedad intelectual",PI[n.pi]);add("Documento asociado",n.doc);
+      f.appendChild(t);f.addEventListener("click",()=>openNodo(n));box.appendChild(f);});}
+  function renderPreguntas(){const box=$("preguntas"),Q=preguntas();box.innerHTML="";box.appendChild(h("h2",null,"Preguntas para el equipo ("+Q.length+")"));
+    if(!Q.length){box.appendChild(h("p",{"class":"hint"},"No quedan preguntas abiertas."));return;}
+    const ol=h("ol");Q.forEach(q=>{const li=h("li");const a=h("a",{href:"#"},q.t);a.addEventListener("click",ev=>{ev.preventDefault();if(q.v)show(q.v);openNodo(byId(q.r.id));});li.appendChild(a);ol.appendChild(li);});box.appendChild(ol);}
+  function renderSintesis(){const box=$("sintesis");box.innerHTML="";box.appendChild(h("h2",null,"Síntesis (se calcula sola)"));const add=t=>box.appendChild(h("p",null,t));
+    const L=dfs(),N=L.length,maxD=L.reduce((m,x)=>Math.max(m,x.d),0),term=D.nodos.filter(n=>n.descomponible==="no").length,comp=D.nodos.filter(n=>n.que&&n.como).length;
+    const R=L.map(x=>regla(x.n)).filter(Boolean);
+    add(N+" globitos en "+(maxD+1)+" niveles (0 a "+maxD+"); "+term+" paquetes de trabajo terminales.");
+    add("Con QUÉ y CÓMO completos: "+comp+" de "+N+" ("+(N?Math.round(100*comp/N):0)+" %).");
+    add("Regla del 100 %: "+R.filter(g=>g.ok).length+" de "+R.length+" padres cumplen.");
+    const cr=D.nodos.filter(n=>n.critico);if(cr.length)add("Críticos: "+cr.length+" ("+cr.map(n=>n.acr).join(", ")+").");
+    const pc={};Object.keys(PI).forEach(k=>pc[k]=D.nodos.filter(n=>n.pi===k).length);if(pc.secreto||pc.patente)add("PI: "+pc.secreto+" secretos, "+pc.patente+" candidatos a patente, "+pc.publico+" públicos.");}
+  function renderDoc(){document.querySelectorAll("[data-f]").forEach(e=>{if(document.activeElement!==e)e.textContent=D.doc[e.dataset.f]||"";});
+    const s=SEMA[D.doc.semaforo]||SEMA.rojo;$("sema").style.borderColor=s.h;$("sema-dot").style.background=s.h;$("sema-txt").textContent=D.doc.semaforo||"rojo";$("sema-txt").style.color=s.h;$("sema-desc").textContent=s.d;$("sema-sel").value=D.doc.semaforo||"rojo";
+    document.querySelectorAll(".sema-name").forEach(e=>{e.textContent=(D.doc.semaforo||"rojo")+" — "+s.d;e.style.color=s.h;});document.title="WBS — "+(D.doc.titulo||"");applyPaper();}
+  function renderRot(){document.querySelectorAll("[data-rot]").forEach(r=>{r.innerHTML="";r.appendChild($("tpl-rot").content.cloneNode(true));r.querySelector(".rot-diag").textContent=r.dataset.rot;});}
+  function renderTabs(){const nav=$("tabs");nav.innerHTML="";[["arbol","Árbol"],["dic","Diccionario"],["regla","Regla del 100 %"],["fichas","Fichas críticas"]].forEach(([v,t])=>{
+    const b=h("button",{type:"button",role:"tab","aria-selected":String(view===v)},t);b.addEventListener("click",()=>show(v));nav.appendChild(b);});}
+  function show(v){view=v;document.querySelectorAll(".view").forEach(s=>s.classList.toggle("current",s.dataset.view===view));renderTabs();}
+  function renderAll(){normalize();renderRot();renderArbol();renderDic();renderRegla();renderFichas();renderPreguntas();renderSintesis();renderDoc();show(view);bindDoc();}
+
+  // ---------------------------------------------------------------- diálogos
+  const dlg=$("dlg");
+  function dlgOpen(t){$("dlg-t").textContent=t;$("dlg-b").innerHTML="";$("dlg-b").className="dlg-b";$("dlg-f").innerHTML="";if(!dlg.open)dlg.showModal();return $("dlg-b");}
+  function btn(t,cls,fn){const x=h("button",{type:"button"},t);if(cls)x.className=cls;x.addEventListener("click",fn);$("dlg-f").appendChild(x);}
+  function field(p,lbl,val,type,opts){const l=h("label",null,lbl);let i;if(type==="select"){i=h("select");opts.forEach(o=>i.appendChild(h("option",{value:o[0]},o[1])));i.value=val==null?"":String(val);}
+    else if(type==="area"){i=h("textarea",{rows:2});i.value=val||"";}else{i=h("input",{type:"text"});i.value=val||"";}l.appendChild(i);p.appendChild(l);return i;}
+  const editing=()=>document.body.classList.contains("edit");
+  function setEdit(on){document.body.classList.toggle("edit",on);$("b-edit").setAttribute("aria-pressed",String(on));document.querySelectorAll("[data-f]").forEach(e=>e.contentEditable=on?"true":"false");}
+  function openNodo(n,padre){const isNew=!n;
+    if(!editing()&&!isNew){const b=dlgOpen(n.acr+" · "+n.nombre);b.className="dlg-b ro";
+      [["Nivel",String(nivel(n))],["Padre",(byId(n.padre)||{}).acr],["QUÉ",n.que||"¿?"],["CÓMO",n.como||"¿?"],["¿Se puede descomponer?",n.descomponible==="si"?"Sí":n.descomponible==="no"?"No (paquete de trabajo terminal)":"¿?"],
+       ["Tipo",TIPO[n.tipo]],["Propiedad intelectual",PI[n.pi]],["Crítico",n.critico?"Sí":""],["IDEF0",[n.idef0.entradas,n.idef0.salidas,n.idef0.controles,n.idef0.mecanismos].filter(Boolean).join(" · ")],
+       ["V-Model",[n.vmodel.criterio,n.vmodel.kpi,n.vmodel.test].filter(Boolean).join(" · ")],["Documento asociado",n.doc],["Origen",n.origen]].forEach(r=>{if(!r[1])return;const d=h("div");d.appendChild(h("span",{"class":"k"},r[0]));d.appendChild(h("p",null,r[1]));b.appendChild(d);});
+      btn("Editar","",()=>{setEdit(true);openNodo(n);});btn("Cerrar","pri",()=>dlg.close());return;}
+    n=n||{id:uid("w"),acr:"",padre:padre||(raiz()||{}).id||"",nombre:"",que:"",como:"",descomponible:"",tipo:"proceso",critico:false,pi:"sin_definir",idef0:{},vmodel:{},doc:"",origen:""};
+    const b=dlgOpen(isNew?"Nuevo globito":"Editar "+n.acr);
+    const desc=new Set([n.id]);let grew=true;while(grew){grew=false;D.nodos.forEach(x=>{if(desc.has(x.padre)&&!desc.has(x.id)){desc.add(x.id);grew=true;}});}
+    const isRoot=!isNew&&n===raiz();
+    const fPa=isRoot?null:field(b,"Padre",n.padre,"select",dfs().filter(x=>!desc.has(x.n.id)).map(x=>[x.n.id,"  ".repeat(x.d)+x.n.acr+" · "+trunc(x.n.nombre,40)]));
+    const r1=h("div",{"class":"row2"});b.appendChild(r1);const fAc=field(r1,isRoot?"Acrónimo (libre en la raíz)":"Acrónimo (convención α; vacío = lo propone la herramienta)",n.acr),fNo=field(r1,"Nombre completo",n.nombre);
+    const fQ=field(b,"QUÉ: función abstracta (no cambia aunque cambie el equipo)",n.que,"area"),fC=field(b,"CÓMO: mecanismo concreto (separá las acciones con → o +)",n.como,"area");
+    const r2=h("div",{"class":"row3"});b.appendChild(r2);const fD=field(r2,"¿Se puede descomponer?",n.descomponible,"select",[["","¿?"],["si","Sí"],["no","No (terminal)"]]),fT=field(r2,"Tipo",n.tipo,"select",Object.keys(TIPO).map(k=>[k,TIPO[k]])),fP=field(r2,"Propiedad intelectual",n.pi,"select",Object.keys(PI).map(k=>[k,PI[k]]));
+    const ckl=h("label",{style:"display:flex;gap:6px;align-items:center;color:var(--ink)"});const ck=h("input",{type:"checkbox",style:"width:auto"});ck.checked=n.critico;ckl.appendChild(ck);ckl.appendChild(document.createTextNode("Globito crítico (patentable, regulatorio o define la calidad): lleva IDEF0 y V-Model"));b.appendChild(ckl);
+    const fs=h("fieldset");fs.appendChild(h("legend",null,"IDEF0 y V-Model"));b.appendChild(fs);const g1=h("div",{"class":"row2"});fs.appendChild(g1);
+    const fE=field(g1,"Entradas",n.idef0.entradas),fS=field(g1,"Salidas",n.idef0.salidas),fCo=field(g1,"Controles (normas, SOP)",n.idef0.controles),fM=field(g1,"Mecanismos (equipos, personas, software)",n.idef0.mecanismos);
+    const g2=h("div",{"class":"row3"});fs.appendChild(g2);const fCr=field(g2,"Criterio de aceptación",n.vmodel.criterio),fK=field(g2,"KPI",n.vmodel.kpi),fTe=field(g2,"Test",n.vmodel.test);
+    const sync=()=>{fs.style.display=ck.checked?"grid":"none";};ck.addEventListener("change",sync);sync();
+    const r3=h("div",{"class":"row2"});b.appendChild(r3);const fDo=field(r3,"Documento asociado (SOP, plano, hoja de datos)",n.doc),fO=field(r3,"Origen",n.origen);
+    if(!isNew&&!isRoot){btn("Borrar","del",()=>{kids(n.id).forEach(k=>k.padre=n.padre);D.nodos=D.nodos.filter(x=>x!==n);save();dlg.close();renderAll();});
+      btn("+ Hijo","",()=>{openNodo(null,n.id);});}
+    if(isRoot)btn("+ Hijo","",()=>{openNodo(null,n.id);});
+    btn("Cancelar","",()=>dlg.close());
+    btn("Guardar","pri",()=>{if(!fNo.value.trim()){fNo.focus();return;}
+      Object.assign(n,{padre:fPa?fPa.value:"",acr:fAc.value.trim(),nombre:fNo.value.trim(),que:fQ.value.trim(),como:fC.value.trim(),descomponible:fD.value,tipo:fT.value,pi:fP.value,critico:ck.checked,
+        idef0:{entradas:fE.value.trim(),salidas:fS.value.trim(),controles:fCo.value.trim(),mecanismos:fM.value.trim()},vmodel:{criterio:fCr.value.trim(),kpi:fK.value.trim(),test:fTe.value.trim()},doc:fDo.value.trim(),origen:fO.value.trim()});
+      n.acrPropuesto=!n.acr;if(isNew)D.nodos.push(n);save();dlg.close();renderAll();});}
+  function msg(t,x){const b=dlgOpen(t);b.appendChild(h("p",{style:"margin:0;white-space:pre-line"},x));btn("Cerrar","pri",()=>dlg.close());}
+
+  // ---------------------------------------------------------------- importar
+  const SIN=new Set(["decision","revision","terminal"]);
+  function fromFlujo(o){const d=o.doc||{};const nodos=[];const root={id:"root",acr:d.acronimo||"PRY",padre:"",nombre:d.titulo||"",que:d.objetivo||"",como:"",descomponible:"si",tipo:"proceso",origen:"Flujo del proyecto"};nodos.push(root);
+    (o.etapas||[]).forEach(e=>nodos.push({id:"e-"+e.id,acr:e.id,padre:"root",nombre:e.nombre,que:"",como:"",descomponible:"si",tipo:"proceso",origen:"Flujo del proyecto"}));
+    const tipo=n=>n.control?"validacion":n.tipo==="datos"?"entrada":n.tipo==="documento"?"documento":"proceso";
+    const ok=new Set((o.nodos||[]).filter(n=>!SIN.has(n.tipo)).map(n=>n.id));
+    (o.nodos||[]).forEach(n=>{if(SIN.has(n.tipo))return;const padre=n.padre&&ok.has(n.padre)?n.padre:"e-"+n.etapa;
+      if(n.tipo==="enlace"){const r=(o.rutas||[]).find(x=>x.id===n.ruta);if(!r)return;
+        nodos.push({id:"ruta-"+r.id,acr:r.acr||"",padre,nombre:"Ruta de fabricación: "+r.nombre,que:"",como:r.pasos.map(p=>p.texto).join(" → "),descomponible:"si",tipo:"proceso",origen:n.origen||""});
+        r.pasos.forEach(p=>nodos.push({id:p.id,acr:p.acr||"",padre:"ruta-"+r.id,nombre:p.texto,que:"",como:"",descomponible:"no",tipo:p.control?"validacion":"proceso",pi:p.pi||"sin_definir",critico:p.pi==="patente"||p.pi==="secreto",
+          vmodel:p.control?{criterio:p.control.criterio||"",kpi:p.control.que||"",test:p.control.referencia||""}:{},origen:p.origen||""}));return;}
+      nodos.push({id:n.id,acr:n.acr||"",padre,nombre:n.texto,que:"",como:"",descomponible:"",tipo:tipo(n),vmodel:n.control?{criterio:n.control.criterio||"",kpi:n.control.que||"",test:n.control.referencia||""}:{},origen:n.origen||""});});
+    nodos.forEach(n=>{if(!n.descomponible)n.descomponible=nodos.some(x=>x.padre===n.id)?"si":"";});
+    D={doc:{codigo:(d.codigo||"").replace(/-FP-/,"-WBS-")||"WBS",version:d.version||"0.1",fecha:d.fecha||"",estado:"Borrador desde el flujo",semaforo:d.semaforo||"rojo",titulo:d.titulo||"",elaboro:d.elaboro||"",reviso:"—",aprobo:"—",autores:d.autores||"",acronimo:d.acronimo||"",origen:"Árbol armado desde el flujo del proyecto "+(d.codigo||"")+". Falta escribir el QUÉ y el CÓMO de cada globito."},nodos};
+    normalize();save();renderAll();msg("Árbol armado desde el flujo",D.nodos.length+" globitos. Las decisiones y las revisiones quedaron afuera (los IF no van en la WBS). Ahora falta lo que el flujo no tiene: el QUÉ y el CÓMO de cada globito, y la regla del 100 %.");}
+  function parseCSV(t){t=t.replace(/^\uFEFF/,"");const first=t.split(/\r?\n/)[0]||"";const sep=(first.split(";").length>first.split(",").length)?";":",";const rows=[];let row=[],cell="",q=false;
+    for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell="";}
+      else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}else cell+=ch;}if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.join("").trim());}
+  function fromCSV(t){const rows=parseCSV(t),hd=rows.shift().map(norm),ix=k=>hd.findIndex(x=>x.startsWith(k));const ia=ix("acronimo"),ip=ix("padre"),inm=ix("nombre"),iq=ix("que"),ic=ix("como"),idc=ix("descomp");
+    if(ia<0||inm<0)throw new Error("Faltan las columnas «Acrónimo» o «Nombre».");const byAcr={};
+    const ns=rows.map(r=>{const n={id:uid("w"),acr:(r[ia]||"").trim(),padre:"",nombre:(r[inm]||"").trim(),que:iq>=0?(r[iq]||"").trim():"",como:ic>=0?(r[ic]||"").trim():"",descomponible:idc>=0?(/^s/i.test(r[idc]||"")?"si":/^n/i.test(r[idc]||"")?"no":""):"",tipo:"proceso",_p:ip>=0?(r[ip]||"").trim():""};byAcr[n.acr]=n;return n;});
+    ns.forEach(n=>{const p=byAcr[n._p];n.padre=p?p.id:"";delete n._p;});D.nodos=ns;normalize();save();renderAll();}
+  $("f-imp").addEventListener("change",function(){const file=this.files[0];if(!file)return;const rd=new FileReader();
+    rd.onload=()=>{try{if(/\.csv$/i.test(file.name))return fromCSV(rd.result);const o=JSON.parse(rd.result);
+      if(o.etapas&&o.nodos)return fromFlujo(o);if(o.nodos&&o.doc){D=o;normalize();save();renderAll();return;}throw new Error("No es una WBS ni un flujo del proyecto.");}
+      catch(e){msg("No se pudo importar","Revisá el archivo: "+e.message);}};rd.readAsText(file,"utf-8");this.value="";});
+
+  // ---------------------------------------------------------------- exportar
+  function download(name,text,type){const a=h("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  const slug=()=>(D.doc.codigo||"wbs").replace(/[^A-Za-z0-9._-]+/g,"_");
+  const esc=s=>String(s==null?"":s).replace(/\|/g,"\\|").replace(/\n/g," ");
+  function mdDic(){const L=dfs();let s="# Diccionario de la WBS — "+(D.doc.titulo||"")+"\n*Código: "+(D.doc.codigo||"")+" | Versión: "+(D.doc.version||"")+" | Fecha: "+(D.doc.fecha||"")+" | Elaboró: "+(D.doc.elaboro||"")+" | Semáforo: "+(D.doc.semaforo||"")+"*\n\n## Tabla maestra\n\n| Acrónimo | Nivel | Padre | Nombre completo | QUÉ | CÓMO | Descomponible |\n|---|---|---|---|---|---|---|\n";
+    L.forEach(({n,d})=>{const p=byId(n.padre);s+="| `"+n.acr+"` | "+d+" | "+(p?"`"+p.acr+"`":"—")+" | "+esc(n.nombre)+" | "+esc(n.que)+" | "+esc(n.como)+" | "+(n.descomponible==="si"?"Sí":n.descomponible==="no"?"No":"")+" |\n";});
+    const C=L.filter(x=>x.n.critico);if(C.length){s+="\n## Columnas extendidas (globitos críticos)\n\n| Acrónimo | IDEF0 entradas | IDEF0 salidas | IDEF0 controles | IDEF0 mecanismos | Criterio | KPI | Test | PI | Documento |\n|---|---|---|---|---|---|---|---|---|---|\n";
+      C.forEach(({n})=>{s+="| `"+n.acr+"` | "+[n.idef0.entradas,n.idef0.salidas,n.idef0.controles,n.idef0.mecanismos,n.vmodel.criterio,n.vmodel.kpi,n.vmodel.test,PI[n.pi],n.doc].map(esc).join(" | ")+" |\n";});}
+    return s+"\n*Generado con la herramienta WBS y Diccionario DiDe (CaPI).*\n";}
+  function mermaid(){const max=+$("fl-niv").value,r=raiz(),id=n=>norm(n.acr).replace(/[^a-z0-9]/g,"_")||n.id;let s="flowchart TD\n";
+    const shape=(n)=>{const t=(n.acr+": "+n.nombre).replace(/"/g,"'");if(n===r)return'[/"'+t+'"/]:::titulo';if(n.tipo==="validacion")return'{{"'+t+'"}}:::medicion';if(n.tipo==="entrada")return'[/"'+t+'"/]:::proceso';if(n.tipo==="documento")return'[("'+t+'")]:::proceso';return'["'+t+'"]:::proceso';};
+    const L=dfs().filter(x=>x.d<=max);L.forEach(({n})=>{s+="    "+id(n)+shape(n)+"\n";});s+="\n";L.forEach(({n})=>{const p=byId(n.padre);if(p&&L.some(x=>x.n===p))s+="    "+id(p)+" --> "+id(n)+"\n";});
+    return s+"\n    classDef titulo  fill:#EEEDFE,stroke:#534AB7,color:#26215C\n    classDef proceso fill:#FAECE7,stroke:#993C1D,color:#4A1B0C\n    classDef medicion fill:#FAEEDA,stroke:#854F0B,color:#412402\n";}
+  $("sel-exp").addEventListener("change",function(){const v=this.value;this.value="";
+    if(v==="json")download(slug()+".json",JSON.stringify(D,null,1),"application/json");
+    if(v==="dic")download(slug()+"_Diccionario.md",mdDic(),"text/markdown");
+    if(v==="csv"){const c=x=>{x=String(x==null?"":x);return /[;"\n]/.test(x)?'"'+x.replace(/"/g,'""')+'"':x;};
+      download(slug()+"_Diccionario.csv","\uFEFF"+[["Acrónimo","Nivel","Padre","Nombre","QUÉ","CÓMO","Descomponible","PI","Origen"]].concat(dfs().map(({n,d})=>[n.acr,d,(byId(n.padre)||{}).acr||"",n.nombre,n.que,n.como,n.descomponible==="si"?"Sí":n.descomponible==="no"?"No":"",PI[n.pi],n.origen])).map(r=>r.map(c).join(";")).join("\n"),"text/csv");}
+    if(v==="mmd")download(slug()+".mmd",mermaid(),"text/plain");
+    if(v==="wbs")download(slug()+"_arbol.md","# WBS — "+(D.doc.titulo||"")+"\n\n"+dfs().map(({n,d})=>"  ".repeat(d)+"- `"+n.acr+"` — "+n.nombre+(n.que?" · QUÉ: "+n.que:"")).join("\n")+"\n","text/markdown");});
+
+  // ---------------------------------------------------------------- impresión y documento
+  function applyPaper(){const d=D.doc,s=SEMA[d.semaforo]||SEMA.rojo,box="font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;";
+    $("papel").textContent="@page{size:"+pref.papel+" landscape;margin:10mm 10mm 10mm 20mm;"+
+      "@top-left{content:"+cssStr((d.codigo||"")+" · WBS y Diccionario DiDe · "+(d.titulo||""))+";"+box+"}@top-right{content:"+cssStr("Versión "+(d.version||"")+" · "+(d.fecha||""))+";"+box+"}"+
+      "@bottom-left{content:"+cssStr("Elaboró: "+(d.elaboro||"")+" · Semáforo: "+(d.semaforo||"")+" — "+s.d)+";"+box+"}@bottom-right{content:\"Página \" counter(page) \" de \" counter(pages);"+box+"}}";$("sel-papel").value=pref.papel;}
+  function bindDoc(){document.querySelectorAll("[data-f]").forEach(e=>{if(e._b)return;e._b=true;e.contentEditable=editing()?"true":"false";
+    e.addEventListener("input",()=>{D.doc[e.dataset.f]=e.textContent;save();document.querySelectorAll('[data-f="'+e.dataset.f+'"]').forEach(o=>{if(o!==e)o.textContent=e.textContent;});applyPaper();});});}
+  $("sema-sel").addEventListener("change",function(){D.doc.semaforo=this.value;save();renderDoc();});
+  $("b-edit").addEventListener("click",()=>setEdit(!editing()));$("b-add").addEventListener("click",()=>openNodo(null));
+  $("fl-niv").addEventListener("change",()=>{renderArbol();renderDic();});$("d-x").addEventListener("click",()=>dlg.close());
+  $("b-print").addEventListener("click",()=>{document.body.classList.add("print-all");window.print();});
+  $("b-print-v").addEventListener("click",()=>{document.body.classList.remove("print-all");window.print();});
+  window.addEventListener("afterprint",()=>document.body.classList.remove("print-all"));
+  $("sel-papel").addEventListener("change",function(){pref.papel=this.value;savePref();applyPaper();});
+  $("b-reset").addEventListener("click",()=>{const b=dlgOpen("Volver a los datos del archivo");b.appendChild(h("p",{style:"margin:0"},"Se pierden los cambios guardados en este navegador. Exportá un JSON antes si los querés conservar."));
+    btn("Cancelar","",()=>dlg.close());btn("Volver a los datos","del",()=>{try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);normalize();dlg.close();renderAll();});});
+  if(location.hash==="#todo")document.body.classList.add("print-all");else if(location.hash.length>1)view=decodeURIComponent(location.hash.slice(1));
+  load();renderAll();
+})();
+</script>
+</body>
+</html>
