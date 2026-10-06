@@ -72,7 +72,7 @@ function crearEtapa1_LaIdea() {
   configurarForm_(form);
 
   form.setDescription(
-    'Paso 1 de DiDe — CaPI. ETAPA I de II.\n\n' +
+    'Paso 1 de DiDe — CaPI. ETAPA 1 de 2.\n\n' +
     introComun_() + '\n\n' +
     'Esta Etapa I es sobre LA IDEA: qué es, para qué sirve y en qué se diferencia. ' +
     'La Etapa II (recursos y financiamiento) llega más adelante, por separado.'
@@ -323,7 +323,7 @@ function crearEtapa2_ElProyecto() {
   configurarForm_(form);
 
   form.setDescription(
-    'Paso 1 de DiDe — CaPI. ETAPA II de II.\n\n' +
+    'Paso 1 de DiDe — CaPI. ETAPA 2 de 2.\n\n' +
     'Segunda y última parte, más corta que la primera. Acá se trata de LO QUE EL PROYECTO NECESITA ' +
     'para existir de verdad: recursos, escala y financiamiento.\n\n' +
     'Igual que en la Etapa I, cada pregunta trae un ejemplo resuelto de SincLE (un sistema de ' +

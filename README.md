@@ -18,7 +18,7 @@ desde el primer lote como si fuéramos a calificar. Ver
 
 | # | Paso | Pregunta que responde | Material |
 |---|---|---|---|
-| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Herramienta](Herramientas/DiDe_Concepto.html) · [Formularios de Google para copiar](https://docs.google.com/forms/d/1Fn6Q0X5z7JyiRmCyTmeUxRRRBxj4Ah_qyYfrHikaQcc/copy) ([Etapa II](https://docs.google.com/forms/d/1jU1HKuLQxEX4mqn0QVHSK8A4689wIT1Tcd2OJ13-NGg/copy)) · [Script](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
+| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Herramienta](Herramientas/DiDe_Concepto.html) · Formularios de Google para copiar: [Etapa 1 · La Idea](https://docs.google.com/forms/d/19tbqAdXX9Kbkxx6k5Oa_JnHK6bzSiiM1TavCsKjxzfM/copy) y [Etapa 2 · El Proyecto](https://docs.google.com/forms/d/1o1z7jOD_13NU2b6XQJDX63CS0jZ7yjWllJntHC1AVS0/copy) · [Script](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
 | 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Herramienta](Herramientas/DiDe_A3.html) · [Guía](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
 | 3 | Flujo del proyecto | ¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación? | [Herramienta](Herramientas/DiDe_FlujoProyecto.html) |
 | 4 | Ishikawa 6M | ¿Qué hay que controlar para que el resultado se repita? | [Herramienta](Herramientas/DiDe_Ishikawa.html) |
