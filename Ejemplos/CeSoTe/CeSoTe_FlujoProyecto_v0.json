@@ -1,0 +1,609 @@
+{
+ "doc": {
+  "codigo": "CeSoTe-FP-01",
+  "version": "0.2",
+  "fecha": "2026-10-05",
+  "estado": "Ejercicio · revisado por J",
+  "semaforo": "verde",
+  "titulo": "CeSoTe · Celdas Solares Terrestres — Fase 1: desarrollo de la ruta de fabricación",
+  "objetivo": "Desarrollar y congelar una ruta de fabricación de celdas de silicio a escala de laboratorio, trazable wafer por wafer y lista para transferir.",
+  "acronimo": "CeSoTe",
+  "fase": "Fase 1 · TRL 4 → 5",
+  "trl": "4 → 5",
+  "elaboro": "J (jefa del grupo) con E, R, F y Q",
+  "reviso": "—",
+  "aprobo": "—",
+  "autores": "E, R, F, Q, J (perfiles ficticios)",
+  "origen": "Ejercicio CaPI con perfiles ficticios. v0.1 armada a mano desde el A3 y las encuestas; v0.2 con la sesión de J (CeSoTe_Experta_Recorrido-DiDe_v0.md)."
+ },
+ "etapas": [
+  {
+   "id": "pln",
+   "nombre": "Planificación"
+  },
+  {
+   "id": "drq",
+   "nombre": "Determinación de requisitos"
+  },
+  {
+   "id": "mpl",
+   "nombre": "Implementación"
+  },
+  {
+   "id": "vld",
+   "nombre": "Validación"
+  },
+  {
+   "id": "pmv",
+   "nombre": "PMV Fase 1"
+  }
+ ],
+ "nodos": [
+  {
+   "id": "p01",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "DiDe",
+   "origen": "Método"
+  },
+  {
+   "id": "p02",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "Concepto",
+   "origen": "Método"
+  },
+  {
+   "id": "p03",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "A3",
+   "origen": "Método"
+  },
+  {
+   "id": "p04",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "Flujo del proyecto",
+   "origen": "Método"
+  },
+  {
+   "id": "p05",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "Ishikawa 6M",
+   "origen": "Método"
+  },
+  {
+   "id": "p06",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "AMFE de proceso y plan de control",
+   "origen": "Método"
+  },
+  {
+   "id": "p07",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "WBS",
+   "origen": "Método"
+  },
+  {
+   "id": "p08",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "Diccionario",
+   "origen": "Método"
+  },
+  {
+   "id": "p09",
+   "etapa": "pln",
+   "padre": "p01",
+   "tipo": "documento",
+   "texto": "BIM",
+   "origen": "Método"
+  },
+  {
+   "id": "p10",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Fijar el TRL de partida y de llegada de cada fase (ISO 16290)",
+   "origen": "J"
+  },
+  {
+   "id": "p11",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Estudio de mercado: socios industriales y armadores",
+   "origen": "R, A3 1"
+  },
+  {
+   "id": "p12",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "decision",
+   "texto": "¿Un socio industrial valora una ruta trazable y transferible?",
+   "origen": "A3 3, J",
+   "si": "Seguir",
+   "no": "Revisar la caja 3 del A3"
+  },
+  {
+   "id": "p13",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Búsqueda de libertad de operación (patentes de terceros)",
+   "origen": "J",
+   "nota": "Antes de elegir la arquitectura: hubo litigios internacionales por patentes de PERC y de TOPCon."
+  },
+  {
+   "id": "p14",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Elegir la arquitectura de la ruta innovadora (PERC, TOPCon u otra)",
+   "origen": "F, J",
+   "nota": "Depende de la búsqueda de libertad de operación. Primero se valida la línea con la ruta base Al-BSF."
+  },
+  {
+   "id": "p15",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Línea base ambiental del sitio",
+   "origen": "E"
+  },
+  {
+   "id": "p16",
+   "etapa": "pln",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Presupuesto y financiamiento de la Fase 1",
+   "origen": "A3 7"
+  },
+  {
+   "id": "r01",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Especificación de la celda: eficiencia, dispersión entre lotes y qué es una «celda buena»",
+   "origen": "F, R, A3 8"
+  },
+  {
+   "id": "r02",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Trazabilidad wafer por wafer",
+   "origen": "A3 3, J"
+  },
+  {
+   "id": "r03",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Árbol de documentos: PID, especificación de cada proceso, hoja de ruta por lote",
+   "origen": "J"
+  },
+  {
+   "id": "r04",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Transferible, certificable, modular y extensible",
+   "origen": "CT, A3 9"
+  },
+  {
+   "id": "r05",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Normas: IEC 60904, IEC 63202, ISO 14644 (IEC 61215/61730 en la Fase 2)",
+   "origen": "R, F"
+  },
+  {
+   "id": "r06",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Especificación propia de insumos (wafers, químicos, gases)",
+   "origen": "Q, A3 2"
+  },
+  {
+   "id": "r07",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Inventario de químicos y gases; seguridad química (HF, silano)",
+   "origen": "E, Propuesta"
+  },
+  {
+   "id": "r08",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Huella declarada (ISO 14040/44) y plan de fin de vida",
+   "origen": "E"
+  },
+  {
+   "id": "r09",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "decision",
+   "texto": "¿Permiso ambiental aprobado?",
+   "origen": "E",
+   "si": "Implementación",
+   "no": "Rediseñar efluentes"
+  },
+  {
+   "id": "r10",
+   "etapa": "drq",
+   "padre": "",
+   "tipo": "revision",
+   "texto": "R1 · ¿Especificación y árbol de documentos aprobados?",
+   "origen": "J",
+   "si": "Implementación",
+   "no": "Completar los requisitos"
+  },
+  {
+   "id": "m01",
+   "etapa": "mpl",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Calibrar y validar los métodos de medición (antes del primer lote)",
+   "origen": "F, J",
+   "control": {
+    "tipo": "calibracion",
+    "que": "Simulador solar, celda de referencia, 4 puntas, elipsómetro, perfilómetro",
+    "referencia": "Celda de referencia calibrada por un laboratorio acreditado; patrones de cada equipo",
+    "criterio": "Certificados vigentes; la celda testigo da su valor dentro de la incertidumbre declarada",
+    "reaccion": "No se mide ningún lote hasta recalibrar",
+    "resultado": ""
+   }
+  },
+  {
+   "id": "m02",
+   "etapa": "mpl",
+   "padre": "",
+   "tipo": "enlace",
+   "texto": "Ruta de fabricación base (Al-BSF, laboratorio)",
+   "origen": "Q, J",
+   "ruta": "DP-02"
+  },
+  {
+   "id": "m03",
+   "etapa": "mpl",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Tratamiento de efluentes y lavado de gases",
+   "origen": "E"
+  },
+  {
+   "id": "m04",
+   "etapa": "mpl",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Calificación de proveedores de insumos",
+   "origen": "Propuesta, A3 2"
+  },
+  {
+   "id": "m05",
+   "etapa": "mpl",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Formación de técnicos y doctorandos en sala limpia y en procesos micro y nanotecnológicos",
+   "origen": "CT, A3 5, A3 9"
+  },
+  {
+   "id": "m06",
+   "etapa": "mpl",
+   "padre": "",
+   "tipo": "revision",
+   "texto": "R2 · ¿La dispersión de los lotes divididos está dentro de la especificación?",
+   "origen": "J",
+   "si": "Congelar la ruta y pasar a Validación",
+   "no": "Ishikawa del lote (CeSoTe-ISH-01) y ajustar la ventana"
+  },
+  {
+   "id": "v01",
+   "etapa": "vld",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Lote de calificación de proceso",
+   "origen": "F, J",
+   "control": {
+    "tipo": "calificacion",
+    "que": "Eficiencia, dispersión y ensayos ambientales seleccionados",
+    "referencia": "Especificación de la celda y método I-V validado",
+    "criterio": "",
+    "reaccion": "Abrir una no conformidad y volver a R2",
+    "resultado": ""
+   }
+  },
+  {
+   "id": "v02",
+   "etapa": "vld",
+   "padre": "",
+   "tipo": "proceso",
+   "texto": "Degradación inducida por luz",
+   "origen": "F",
+   "control": {
+    "tipo": "verificacion",
+    "que": "Pérdida de potencia después de la exposición",
+    "referencia": "IEC 63202-1",
+    "criterio": "",
+    "reaccion": "",
+    "resultado": ""
+   }
+  },
+  {
+   "id": "v03",
+   "etapa": "vld",
+   "padre": "",
+   "tipo": "revision",
+   "texto": "R3 · ¿El lote de calificación pasó?",
+   "origen": "J",
+   "si": "PMV de la Fase 1",
+   "no": "Volver a la ruta"
+  },
+  {
+   "id": "v04",
+   "etapa": "vld",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Fase 2: campo (NOA y Patagonia), ciclo de vida y certificación IEC 61215/61730",
+   "origen": "R, E",
+   "nota": "Pasan a la Fase 2 (decisión de J)."
+  },
+  {
+   "id": "x01",
+   "etapa": "pmv",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Ruta congelada",
+   "origen": "J"
+  },
+  {
+   "id": "x02",
+   "etapa": "pmv",
+   "padre": "x01",
+   "tipo": "documento",
+   "texto": "PID en dos versiones: completa y para el cliente",
+   "origen": "F, J"
+  },
+  {
+   "id": "x03",
+   "etapa": "pmv",
+   "padre": "x01",
+   "tipo": "documento",
+   "texto": "Informe del lote de calificación",
+   "origen": "F"
+  },
+  {
+   "id": "x04",
+   "etapa": "pmv",
+   "padre": "x01",
+   "tipo": "documento",
+   "texto": "Matriz de PI por paso",
+   "origen": "J"
+  },
+  {
+   "id": "x05",
+   "etapa": "pmv",
+   "padre": "",
+   "tipo": "datos",
+   "texto": "Doctorandos y técnicos formados",
+   "origen": "CT, A3 9"
+  }
+ ],
+ "rutas": [
+  {
+   "id": "DP-02",
+   "nombre": "Ruta base Al-BSF",
+   "acr": "",
+   "escala": "laboratorio",
+   "tecnologia": "Silicio cristalino, campo trasero de aluminio (Al-BSF)",
+   "entrada": "Wafers de silicio (lotes de pocos wafers)",
+   "salida": "Celdas medidas y clasificadas",
+   "pasos": [
+    {
+     "id": "s00",
+     "texto": "Identificación de wafers y apertura de la hoja de ruta",
+     "origen": "J",
+     "pi": "publico",
+     "estado": "congelado",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Cada wafer con su código y su hoja de ruta",
+      "referencia": "Registro de la línea",
+      "criterio": "100 %",
+      "reaccion": "El wafer no entra a la ruta",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": ""
+    },
+    {
+     "id": "s01",
+     "texto": "Recepción e inspección de wafers",
+     "origen": "Q, J",
+     "pi": "publico",
+     "estado": "congelado",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Resistividad y espesor",
+      "referencia": "Certificado del proveedor contrastado con una muestra propia",
+      "criterio": "Según la especificación de insumos",
+      "reaccion": "Rechazar el lote y reclamar al proveedor",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": ""
+    },
+    {
+     "id": "s02",
+     "texto": "Limpieza y texturizado",
+     "origen": "Q, J",
+     "pi": "secreto",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Reflectancia",
+      "referencia": "Patrón de reflectancia calibrado",
+      "criterio": "",
+      "reaccion": "Retexturizar o descartar; registrar",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": "Ventana a fijar con lote dividido."
+    },
+    {
+     "id": "s03",
+     "texto": "Difusión del emisor",
+     "origen": "Q, J",
+     "pi": "secreto",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Resistencia de lámina (4 puntas)",
+      "referencia": "Oblea patrón",
+      "criterio": "",
+      "reaccion": "Wafer en espera; análisis de causa",
+      "resultado": ""
+     },
+     "experimento": "Temperatura y tiempo de difusión: un valor por wafer, con un wafer testigo",
+     "nota": "Ventana a fijar con lote dividido."
+    },
+    {
+     "id": "s04",
+     "texto": "Remoción del vidrio de fósforo y aislamiento de bordes",
+     "origen": "Q, J",
+     "pi": "publico",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Remoción (prueba de hidrofobicidad) y aislamiento",
+      "referencia": "Fotos patrón",
+      "criterio": "Criterio escrito",
+      "reaccion": "Repetir el paso",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": ""
+    },
+    {
+     "id": "s05",
+     "texto": "Antirreflejo (SiNx)",
+     "origen": "Q, J",
+     "pi": "secreto",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Espesor e índice (elipsometría)",
+      "referencia": "Muestra de espesor conocido",
+      "criterio": "",
+      "reaccion": "Reprocesar",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": "Ventana a fijar con lote dividido."
+    },
+    {
+     "id": "s06",
+     "texto": "Contacto trasero de aluminio y aleado",
+     "origen": "Q, J",
+     "pi": "publico",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Uniformidad; resistencia de contacto",
+      "referencia": "Criterio escrito; estructura de prueba",
+      "criterio": "",
+      "reaccion": "Descartar",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": "Al-BSF es una estructura conocida. Ventana a fijar con lote dividido."
+    },
+    {
+     "id": "s07",
+     "texto": "Contacto frontal: fotolitografía, evaporación y lift-off",
+     "origen": "F, J",
+     "pi": "patente",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Ancho de dedos y espesor",
+      "referencia": "Microscopio y perfilómetro calibrados",
+      "criterio": "",
+      "reaccion": "Reprocesar",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": "Candidato a patente sólo si el diseño de la grilla es nuevo. Ventana a fijar con lote dividido."
+    },
+    {
+     "id": "s08",
+     "texto": "Recocido de contactos",
+     "origen": "Q, J",
+     "pi": "secreto",
+     "estado": "desarrollo",
+     "control": {
+      "tipo": "calibracion",
+      "que": "Perfil térmico del horno",
+      "referencia": "Termocupla de perfil calibrada",
+      "criterio": "",
+      "reaccion": "Ajustar el perfil",
+      "resultado": ""
+     },
+     "experimento": "Temperatura de pico del recocido: un valor por wafer, con un wafer testigo",
+     "nota": "Ventana a fijar con lote dividido."
+    },
+    {
+     "id": "s09",
+     "texto": "Definición del área de la celda",
+     "origen": "F, J",
+     "pi": "publico",
+     "estado": "congelado",
+     "control": {
+      "tipo": "verificacion",
+      "que": "Área de cada celda",
+      "referencia": "Patrón de medida",
+      "criterio": "± tolerancia de la especificación",
+      "reaccion": "Recalcular la eficiencia con el área real",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": ""
+    },
+    {
+     "id": "s10",
+     "texto": "Medición I-V y eficiencia cuántica externa",
+     "origen": "F, J",
+     "pi": "publico",
+     "estado": "congelado",
+     "control": {
+      "tipo": "validacion",
+      "que": "Isc, Voc, FF, eficiencia; celda testigo en cada sesión",
+      "referencia": "Simulador clasificado (IEC 60904-9) y celda de referencia calibrada por un laboratorio acreditado",
+      "criterio": "La celda testigo da su valor dentro de la incertidumbre declarada",
+      "reaccion": "Detener las mediciones y recalibrar",
+      "resultado": ""
+     },
+     "experimento": "",
+     "nota": ""
+    }
+   ]
+  }
+ ]
+}

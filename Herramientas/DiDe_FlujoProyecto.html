@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flujo del proyecto DiDe</title>
+<!--
+  HERRAMIENTA "FLUJO DEL PROYECTO" DiDe — v0.1 (05/10/2026) — Cinthya Toro · CaPI / DiDe
+  Un solo archivo, sin dependencias. Paso 3 de la ruta DiDe:
+    Concepto → A3 → Flujo del proyecto (→ Ruta de fabricación) → Ishikawa → AMFE de proceso y plan de control → WBS → Diccionario → BIM
+
+  Dos tipos de diagrama, unidos con el símbolo "enlace":
+    - Flujo del proyecto (DP-01): columnas por etapa, árbol de hasta 4 niveles (etapa + 3).
+    - Ruta de fabricación (DP-02, DP-03…): secuencia de procesos unitarios, cada uno con su control ✔,
+      su marca de propiedad intelectual (PI) y su estado (en desarrollo o congelado).
+
+  Símbolos (ISO 5807 + agregados DiDe): inicio/fin, proceso, decisión, datos (entrada, salida o requisito),
+  documento, enlace a otro diagrama, revisión (hito con criterio de paso, DiDe) y control ✔ (DiDe) de cuatro
+  tipos: calibración, verificación, validación y calificación.
+
+  Para otro proyecto: copiá este archivo y reemplazá el bloque <script id="datos" type="application/json">,
+  o usá "Importar" (.json con este formato, o .csv de elementos), o "Esqueleto desde Concepto y A3"
+  (CSV de respuestas de Google Forms + A3 en .md generado por CaPI_GenerarA3.py).
+
+  FORMATO JSON
+  { "doc":    { codigo, version, fecha, estado, semaforo (rojo|amarillo|verde), titulo, objetivo, acronimo,
+                fase, trl, elaboro, reviso, aprobo, autores, origen },
+    "etapas": [ { id (acrónimo de la etapa), nombre } ],
+    "nodos":  [ { id, etapa, padre, tipo (terminal|proceso|decision|datos|documento|enlace|revision),
+                  texto, acr, origen, nota, si, no, ruta (para enlace),
+                  control: { tipo (calibracion|verificacion|validacion|calificacion), que, referencia,
+                             criterio, reaccion, resultado, pista } | null } ],
+    "rutas":  [ { id, nombre, acr, escala (laboratorio|produccion), tecnologia, entrada, salida,
+                  pasos: [ { id, texto, acr, origen, nota, pi (publico|secreto|patente|sin_definir),
+                             estado (desarrollo|congelado), experimento, control } ] } ] }
+  CSV de elementos (separador ;): id;etapa;padre;tipo;texto;acr;origen;nota;si;no;ruta;ctipo;que;referencia;criterio;reaccion;resultado
+
+  Impresión: A4 apaisado por defecto (A3 a pedido). Márgenes ISO 5457 (10 mm; 20 mm a la izquierda), rótulo
+  ISO 7200, encabezado y pie en cada hoja con "Página n de N" (requiere Chrome o Edge 131 o posterior).
+-->
+<style>
+  :root{color-scheme:light;
+    --ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--muted:#615d54;--line:#cfc9b8;--teal:#1f6b62;--tealbg:#e3efec;
+    --cal:#1e5aa8;--ver:#1f6b62;--val:#2e7d32;--calif:#6a3d9a;--warn:#b58500;--nd:#b3261e;--hl:#fffbe8;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif)}
+  button,select,input,textarea{font:inherit}
+  .bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 18px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:13px}
+  .bar .grow{flex:1}
+  .bar button,.bar label.btn,.bar select{font-size:13px;padding:6px 10px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .bar button.ghost{background:transparent;color:#fff}
+  .bar button[aria-pressed="true"]{background:#ffd37a;border-color:#ffd37a}
+  .bar input[type=file]{display:none}
+  .page{max-width:1500px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+  .headdoc{background:var(--paper);border:1px solid var(--ink);padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+  .head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0 0 3px}
+  h1{font-size:23px;line-height:1.2;margin:0}
+  .sub{color:var(--muted);font-size:14px;margin:3px 0 0}
+  [data-f]{outline:none;border-radius:3px}
+  body.edit [data-f]{background:var(--hl);border-bottom:1px dotted var(--teal)}
+  .sema{border:2px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px;min-width:230px;font-family:var(--sans)}
+  .ctrl{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--ink);font-size:13px}
+  .ctrl div{padding:5px 8px;border-right:1px solid var(--ink);min-width:0}.ctrl div:last-child{border-right:0}
+  .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;vertical-align:-1px}
+
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;font-family:var(--sans);font-size:13.5px}
+  .tabs button{border:1px solid var(--ink);background:var(--paper);border-radius:5px 5px 0 0;padding:6px 12px;cursor:pointer}
+  .tabs button[aria-selected="true"]{background:var(--ink);color:#fff}
+  .tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--sans);font-size:13px}
+  .tools select,.tools button{border:1px solid var(--line);border-radius:4px;padding:4px 8px;background:var(--paper);cursor:pointer}
+  .legend-ck{display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .ck{display:inline-flex;align-items:center;gap:4px}
+  .ck i{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;color:#fff;font-style:normal;font-size:10px;font-weight:700}
+
+  .view{display:none}
+  .view.current{display:flex}
+  .tabla.view.current{display:block}
+  .sheet{background:var(--paper);border:1px solid var(--ink);padding:14px 18px;flex-direction:column;gap:10px}
+  .run{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:5px}
+  .diagram{position:relative;border:1px solid var(--line);border-radius:5px;overflow:auto;background:#fff}
+  .diagram svg{display:block}
+  svg text{font-family:var(--sans)}
+  .etapa rect{fill:var(--tealbg);stroke:var(--teal);stroke-width:1.5}
+  .etapa text{fill:var(--teal);font-weight:700;letter-spacing:.04em;text-anchor:middle}
+  .conn{fill:none;stroke:#77736a;stroke-width:1.3}
+  .flow{fill:none;stroke:var(--ink);stroke-width:1.6}
+  .nd{cursor:pointer}
+  .nd .sh{fill:#fff;stroke:var(--ink);stroke-width:1.4}
+  .nd.t-revision .sh{fill:#fdf6e3;stroke:var(--warn);stroke-width:2}
+  .nd.t-decision .sh{fill:#fdf1f0}
+  .nd.t-enlace .sh{fill:#eef3fb;stroke:var(--cal)}
+  .nd.t-terminal .sh{fill:#f3f3f1}
+  .nd.dim{opacity:.18}
+  .nd:hover .sh,.nd:focus .sh{stroke-width:2.6}
+  .nd:focus{outline:none}
+  .nd text.tx{fill:var(--ink);text-anchor:middle}
+  .nd text.txl{fill:var(--ink);text-anchor:start}
+  .cap{fill:var(--muted);font-family:var(--mono)!important}
+  .paso .sh{fill:#fff;stroke:var(--ink);stroke-width:1.4}
+  .paso.desarrollo .sh{stroke-dasharray:6 4}
+  .paso.congelado .sh{stroke-width:2.6}
+  .tip{position:fixed;z-index:20;pointer-events:none;max-width:340px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:12.5px;line-height:1.4;padding:7px 9px;border-radius:5px;display:none}
+
+  .rot-row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+  .rot-left{font-family:var(--mono);font-size:10.5px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+  .rotulo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1.5px solid var(--ink);width:min(100%,620px);font-size:11.5px;font-family:var(--sans)}
+  .rotulo div{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:3px 6px;min-width:0}
+  .rotulo div:nth-child(4n){border-right:0}
+  .rotulo div:nth-last-child(-n+4){border-bottom:0}
+  .rotulo .wide{grid-column:span 3}
+
+  .tabla{background:var(--paper);border:1px solid var(--ink);padding:14px 18px}
+  .tabla h2{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin:0 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:var(--sans)}
+  th,td{text-align:left;vertical-align:top;padding:4px 6px;border:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:#faf8f2}
+  td.falta{color:var(--warn);font-weight:600}
+  tbody tr{cursor:pointer}tbody tr:hover{background:var(--hl)}
+
+  .below{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px}
+  .box{background:var(--paper);border:1px solid var(--ink);border-radius:5px;padding:10px 13px;font-size:14px;line-height:1.45;min-width:0;font-family:var(--sans)}
+  .box h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px;color:var(--teal)}
+  .box ol{margin:0;padding-left:20px}
+  .box li{margin:3px 0}
+  .box li a{color:var(--ink);text-decoration:underline dotted}
+  .box li .act{margin-left:6px;border:1px solid var(--teal);color:var(--teal);border-radius:3px;padding:0 5px;text-decoration:none;font-size:12px}
+  .hint{color:var(--muted);font-size:12.5px}
+
+  dialog{border:1px solid var(--ink);border-radius:8px;padding:0;max-width:640px;width:94vw;font-family:var(--sans)}
+  dialog::backdrop{background:rgba(20,18,14,.45)}
+  .dlg-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .dlg-h h3{margin:0;font-size:17px;line-height:1.3}
+  .dlg-b{padding:12px 16px;display:grid;gap:9px;font-size:14px;max-height:68vh;overflow:auto}
+  .dlg-b label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+  .dlg-b input,.dlg-b select,.dlg-b textarea{border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--ink);font-size:14px;width:100%}
+  .dlg-b fieldset{border:1px solid var(--line);border-radius:6px;display:grid;gap:8px;padding:8px 10px}
+  .dlg-b legend{font-size:12px;color:var(--teal);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .dlg-b .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .dlg-f{padding:10px 16px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+  .dlg-f button{padding:6px 12px;border-radius:4px;border:1px solid var(--ink);background:#fff;cursor:pointer}
+  .dlg-f button.pri{background:var(--ink);color:#fff}
+  .dlg-f button.del{border-color:var(--nd);color:var(--nd);margin-right:auto}
+  .ro p{margin:0}.ro .k{margin-bottom:2px}
+  .only-edit{display:none!important} body.edit .only-edit{display:inline-block!important}
+
+  @media print{
+    body{background:#fff}
+    .bar,.headdoc,.tabs,.tools,.below,.tip,dialog,.no-print{display:none!important}
+    .page{display:block;padding:0;max-width:none}
+    .view{display:none!important}
+    body.print-all .view.sheet,.view.sheet.current{display:flex!important}
+    body.print-all .view.tabla,.view.tabla.current{display:block!important}
+    .view{break-before:page}
+    .sheet{border:.7mm solid var(--ink);padding:3mm 4mm;overflow:hidden;gap:2.5mm}
+    .sheet>.run{display:none}  /* el encabezado de la página ya lo muestra */
+    .sheet .diagram{flex:1;min-height:0;border:0;overflow:visible}
+    .sheet .diagram svg{width:100%!important;height:100%!important}
+    .tabla{border:0;padding:0}
+    .tabla table{font-size:9pt}
+    .nd.dim{opacity:1}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="papel"></style>
+</head>
+<body>
+
+<div class="bar">
+  <strong>Flujo del proyecto DiDe</strong>
+  <button type="button" id="b-edit" aria-pressed="false">Editar</button>
+  <button type="button" id="b-add" class="only-edit">+ Elemento</button>
+  <button type="button" id="b-ruta" class="only-edit">+ Ruta de fabricación</button>
+  <span class="grow"></span>
+  <button type="button" id="b-esq">Esqueleto desde Concepto y A3</button>
+  <label class="btn" for="f-imp">Importar</label><input type="file" id="f-imp" accept=".json,.csv">
+  <select id="sel-exp" aria-label="Exportar">
+    <option value="">Exportar…</option>
+    <option value="json">Datos (.json)</option>
+    <option value="csv">Elementos del flujo (.csv)</option>
+    <option value="dic">Diccionario, borrador (.md)</option>
+    <option value="wbs">WBS, borrador (.md)</option>
+    <option value="amfe">AMFE de proceso, esqueleto (.csv)</option>
+    <option value="plan">Plan de control (.csv)</option>
+    <option value="hoja">Hoja de ruta por lote (.csv)</option>
+  </select>
+  <label>Papel <select id="sel-papel" aria-label="Tamaño de papel"><option value="A4">A4</option><option value="A3">A3</option></select></label>
+  <button type="button" id="b-print">Imprimir todo</button>
+  <button type="button" id="b-print-v">Imprimir esta vista</button>
+  <button type="button" id="b-reset" class="ghost">Volver a los datos del archivo</button>
+</div>
+
+<main class="page" id="page">
+
+  <section class="headdoc" aria-label="Control documental">
+    <div class="head">
+      <div>
+        <p class="kicker">DiDe — Paso 3 · Flujo del proyecto</p>
+        <h1 data-f="titulo"></h1>
+        <p class="sub" data-f="objetivo"></p>
+      </div>
+      <div class="sema" id="sema"><span class="k">Semáforo</span><span class="dot" id="sema-dot"></span> <b id="sema-txt"></b>
+        <select id="sema-sel" class="only-edit" aria-label="Color del semáforo"><option value="rojo">rojo</option><option value="amarillo">amarillo</option><option value="verde">verde</option></select>
+        <br><span id="sema-desc" class="hint"></span></div>
+    </div>
+    <div class="ctrl">
+      <div><span class="k">Código</span><span data-f="codigo"></span></div>
+      <div><span class="k">Versión · estado</span><span data-f="version"></span> · <span data-f="estado"></span></div>
+      <div><span class="k">Acrónimo · fase</span><span data-f="acronimo"></span> · <span data-f="fase"></span></div>
+      <div><span class="k">Autores</span><span data-f="autores"></span></div>
+      <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+      <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+      <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+    </div>
+    <p class="hint" style="margin:0">Origen: <span data-f="origen"></span></p>
+  </section>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Diagramas"></nav>
+
+  <div class="tools" id="tools">
+    <label>Origen <select id="fl-o"><option value="">todos</option></select></label>
+    <span class="legend-ck" aria-label="Tipos de control">
+      <span class="ck"><i style="background:var(--cal)">C</i>calibración</span>
+      <span class="ck"><i style="background:var(--ver)">V</i>verificación</span>
+      <span class="ck"><i style="background:var(--val)">✔</i>validación</span>
+      <span class="ck"><i style="background:var(--calif)">Q</i>calificación</span>
+      <span class="ck"><i style="background:#fff;border:2px dashed var(--warn)"></i>control incompleto</span>
+    </span>
+    <span id="ruta-tools"></span>
+  </div>
+
+  <section class="sheet view" id="v-proyecto" data-view="proyecto" aria-label="Flujo del proyecto">
+    <header class="run"><span><b data-f="codigo"></b> · Flujo del proyecto (DP-01) · <span data-f="titulo"></span></span><span>Versión <span data-f="version"></span> · <span data-f="fecha"></span></span></header>
+    <div class="diagram"><svg id="svg-p" role="img" aria-label="Flujo del proyecto"></svg></div>
+    <div class="rot-row" data-rot="Flujo del proyecto (DP-01)"></div>
+  </section>
+
+  <div id="v-rutas"></div>
+
+  <section class="tabla view" id="v-dic" data-view="dic" aria-label="Diccionario">
+    <h2>Diccionario de acrónimos (borrador para el WBS)</h2>
+    <p class="hint no-print">Convención α: tres consonantes en minúscula y un punto entre niveles. Las decisiones, las revisiones y los terminales no llevan acrónimo porque no van al WBS.</p>
+    <table><thead><tr><th>Acrónimo</th><th>Nivel</th><th>Padre</th><th>Nombre</th><th>Tipo</th><th>Origen</th></tr></thead><tbody id="dic-body"></tbody></table>
+  </section>
+
+  <div class="below">
+    <div class="box" id="preguntas"></div>
+    <div class="box" id="sintesis"></div>
+  </div>
+</main>
+
+<template id="tpl-rot">
+  <div class="rot-left">
+    <svg width="330" height="44" viewBox="0 0 330 44" aria-label="Símbolos">
+      <g fill="#fff" stroke="#1b1a16" stroke-width="1.2" font-size="8.5" font-family="Segoe UI,sans-serif">
+        <rect x="2" y="4" width="34" height="16" rx="8"/><rect x="42" y="4" width="34" height="16"/>
+        <polygon points="96,4 112,12 96,20 80,12" fill="#fdf1f0"/><polygon points="122,4 152,4 146,20 116,20"/>
+        <path d="M158 4H192V18Q183 14 175 18T158 18Z"/><ellipse cx="215" cy="12" rx="17" ry="8" fill="#eef3fb" stroke="#1e5aa8"/>
+        <polygon points="244,4 266,4 272,12 266,20 244,20 238,12" fill="#fdf6e3" stroke="#b58500"/>
+      </g>
+      <g font-size="8" fill="#615d54" font-family="Consolas,monospace">
+        <text x="2" y="32">inicio/fin</text><text x="42" y="32">proceso</text><text x="80" y="32">decisión</text>
+        <text x="118" y="32">datos</text><text x="157" y="32">documento</text><text x="200" y="32">enlace</text><text x="238" y="32">revisión</text>
+      </g>
+    </svg>
+    <span>Herramienta Flujo del proyecto DiDe (CaPI) · Símbolos ISO 5807 + DiDe · Hoja ISO 5457 · Rótulo ISO 7200</span>
+  </div>
+  <div class="rotulo" aria-label="Rótulo">
+    <div class="wide"><span class="k">Título</span><span data-f="titulo"></span></div>
+    <div><span class="k">Código</span><b data-f="codigo"></b></div>
+    <div class="wide"><span class="k">Diagrama</span><span class="rot-diag"></span></div>
+    <div><span class="k">Semáforo</span><span class="sema-name"></span></div>
+    <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+    <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+    <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+    <div><span class="k">Versión · fecha</span><span data-f="version"></span> · <span data-f="fecha"></span></div>
+  </div>
+</template>
+
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <div class="dlg-h"><h3 id="dlg-t"></h3><button type="button" id="d-x" aria-label="Cerrar" style="border:0;background:none;font-size:20px;cursor:pointer">×</button></div>
+  <div class="dlg-b" id="dlg-b"></div>
+  <div class="dlg-f" id="dlg-f"></div>
+</dialog>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<!-- DATOS: ejemplo resuelto (SincLE, público). Reemplazar por los del proyecto. -->
+<script id="datos" type="application/json">
+{
+ "doc": {
+  "codigo": "SincLE-FP-01", "version": "0.1", "fecha": "2026-10-05", "estado": "Ejemplo resuelto", "semaforo": "verde",
+  "titulo": "SincLE · Sincroniza la Luz para ver más allá de lo Evidente",
+  "objetivo": "Entender los procesos para planificar, implementar y validar el sistema de sincronización del láser EKSPLA y del espectrómetro LIBS2500+.",
+  "acronimo": "SincLE", "fase": "Prototipo funcional (PMV)", "trl": "",
+  "elaboro": "Cinthya Toro", "reviso": "—", "aprobo": "—", "autores": "Cinthya Toro",
+  "origen": "Diagrama de flujo de SincLE en Excel (hoja Ago26, 31/08/2026), sin la paleta de íconos. La etapa Validación estaba vacía: sus elementos son propuestas (05/10/2026)."
+ },
+ "etapas": [
+  {"id": "pln", "nombre": "Planificación"},
+  {"id": "drq", "nombre": "Determinación de requisitos"},
+  {"id": "mpl", "nombre": "Implementación"},
+  {"id": "vld", "nombre": "Validación"},
+  {"id": "pmv", "nombre": "PMV SincLE"}
+ ],
+ "nodos": [
+  {"id": "n01", "etapa": "pln", "padre": "", "tipo": "datos", "texto": "DiDe", "origen": "Excel"},
+  {"id": "n02", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "Concepto", "origen": "Excel"},
+  {"id": "n03", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "A3", "origen": "Excel"},
+  {"id": "n04", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "Flujo del proyecto", "origen": "Excel", "nota": "En el Excel original se llamaba «Diagrama de procesos»."},
+  {"id": "n05", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "Ishikawa 6M", "origen": "Excel"},
+  {"id": "n06", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "WBS", "origen": "Excel"},
+  {"id": "n07", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "Diccionario", "origen": "Excel"},
+  {"id": "n08", "etapa": "pln", "padre": "n01", "tipo": "documento", "texto": "BIM", "origen": "Excel"},
+  {"id": "n10", "etapa": "drq", "padre": "", "tipo": "datos", "texto": "Seguridad", "origen": "Excel"},
+  {"id": "n11", "etapa": "drq", "padre": "", "tipo": "datos", "texto": "1 microsegundo", "origen": "Excel"},
+  {"id": "n12", "etapa": "drq", "padre": "", "tipo": "datos", "texto": "Adaptativo", "origen": "Excel"},
+  {"id": "n13", "etapa": "drq", "padre": "", "tipo": "datos", "texto": "Modular", "origen": "Excel"},
+  {"id": "n20", "etapa": "mpl", "padre": "", "tipo": "proceso", "texto": "Arduino Mega", "origen": "Excel"},
+  {"id": "n21", "etapa": "mpl", "padre": "n20", "tipo": "datos", "texto": "Software .py .ino", "origen": "Excel"},
+  {"id": "n22", "etapa": "mpl", "padre": "", "tipo": "proceso", "texto": "Sistema de adaptación de impedancia", "origen": "Excel"},
+  {"id": "n23", "etapa": "mpl", "padre": "n22", "tipo": "proceso", "texto": "Hardware", "origen": "Excel"},
+  {"id": "n24", "etapa": "mpl", "padre": "n23", "tipo": "datos", "texto": "Optoacopladores", "origen": "Excel"},
+  {"id": "n25", "etapa": "mpl", "padre": "n23", "tipo": "datos", "texto": "Resistencias de acople", "origen": "Excel"},
+  {"id": "n26", "etapa": "mpl", "padre": "n23", "tipo": "datos", "texto": "Componentes de protección", "origen": "Excel"},
+  {"id": "n27", "etapa": "mpl", "padre": "n23", "tipo": "datos", "texto": "Fuente (USB-Transformador)", "origen": "Excel"},
+  {"id": "n28", "etapa": "mpl", "padre": "", "tipo": "proceso", "texto": "Coaxil Láser", "origen": "Excel"},
+  {"id": "n29", "etapa": "mpl", "padre": "", "tipo": "proceso", "texto": "Coaxil Espectrómetro", "origen": "Excel"},
+  {"id": "n30", "etapa": "vld", "padre": "", "tipo": "proceso", "texto": "Medir el retardo real entre los dos pulsos", "origen": "Propuesta",
+   "control": {"tipo": "verificacion", "que": "Diferencia de tiempo entre los pulsos TTL de los dos pines", "referencia": "", "criterio": "Igual al retardo programado, entre 1 µs y 10 µs, en cada disparo (tolerancia a fijar)", "reaccion": "", "resultado": "", "pista": "Osciloscopio con calibración vigente"}},
+  {"id": "n31", "etapa": "vld", "padre": "", "tipo": "proceso", "texto": "Comparar espectros a distintos retardos con la base del NIST o con modelos", "origen": "A3 8",
+   "control": {"tipo": "validacion", "que": "Espectros LIBS adquiridos a distintos retardos", "referencia": "Base de datos de líneas espectrales del NIST o modelos espectrales", "criterio": "", "reaccion": "", "resultado": ""}},
+  {"id": "n32", "etapa": "vld", "padre": "", "tipo": "decision", "texto": "¿El retardo medido coincide con el programado?", "origen": "Propuesta", "si": "PMV", "no": "Volver a Implementación y ajustar"},
+  {"id": "n40", "etapa": "pmv", "padre": "", "tipo": "datos", "texto": "PMV SincLE", "origen": "Excel"},
+  {"id": "n41", "etapa": "pmv", "padre": "n40", "tipo": "documento", "texto": "Manual", "origen": "Excel"},
+  {"id": "n42", "etapa": "pmv", "padre": "n40", "tipo": "documento", "texto": "Informe", "origen": "Excel"}
+ ],
+ "rutas": []
+}
+</script>
+
+<script>
+(function(){
+  "use strict";
+  // ------------------------------------------------------------------ constantes
+  const TIPOS={terminal:"Inicio / fin",proceso:"Proceso",decision:"Decisión",datos:"Datos (entrada, salida o requisito)",documento:"Documento",enlace:"Enlace a otro diagrama",revision:"Revisión (hito con criterio de paso)"};
+  const SIN_ACR=new Set(["decision","revision","terminal","enlace"]);
+  const CTL={calibracion:{t:"Calibración",l:"C",c:"#1e5aa8",q:"¿Qué patrón trazable usa la calibración?"},
+             verificacion:{t:"Verificación",l:"V",c:"#1f6b62",q:"¿Contra qué especificación, y con qué instrumento calibrado, se verifica?"},
+             validacion:{t:"Validación",l:"✔",c:"#2e7d32",q:"¿Contra qué referencia se demuestra que sirve para el uso previsto?"},
+             calificacion:{t:"Calificación",l:"Q",c:"#6a3d9a",q:"¿Qué ensayos y con qué margen lo califican?"}};
+  const PI={publico:{t:"Público",c:"#8a8578"},secreto:{t:"Secreto",c:"#b3261e"},patente:{t:"Candidato a patente",c:"#b58500"},sin_definir:{t:"Sin definir",c:"#cfc9b8"}};
+  const SEMA={rojo:{h:"#b3261e",d:"Sólo autores y capacitadora."},amarillo:{h:"#b58500",d:"Todo el grupo."},verde:{h:"#2e7d32",d:"Público."}};
+  const STOP=new Set("de del la las el los y e en con para por a al un una unos unas que se su sus o u lo le les mas más sin entre sobre desde hasta como cada otro otra este esta estos estas".split(" "));
+  const NS="http://www.w3.org/2000/svg";
+
+  // Biblioteca de rutas típicas: pasos genéricos y controles; la referencia queda vacía, con una pista.
+  const BIB={
+   "csi-albsf-lab":{nombre:"Celda de silicio Al-BSF · ruta base",escala:"laboratorio",tecnologia:"Silicio cristalino, campo trasero de aluminio (Al-BSF)",entrada:"Wafers de silicio",salida:"Celdas medidas y clasificadas",
+     desc:"Ruta base conocida para validar una línea de laboratorio antes de introducir mejoras.",
+     pasos:[["Identificación de wafers y apertura de la hoja de ruta","verificacion","Cada wafer con su código y su hoja de ruta","Registro de la línea"],
+            ["Recepción e inspección de wafers","verificacion","Resistividad, espesor, tiempo de vida","Certificado del proveedor contrastado con una muestra propia"],
+            ["Limpieza y texturizado","verificacion","Reflectancia ponderada","Patrón de reflectancia calibrado"],
+            ["Difusión del emisor","verificacion","Resistencia de lámina (4 puntas)","Oblea patrón de resistencia de lámina"],
+            ["Remoción del vidrio de fósforo y aislamiento de bordes","verificacion","Remoción y aislamiento","Criterio escrito con fotos patrón"],
+            ["Antirreflejo (SiNx)","verificacion","Espesor e índice (elipsometría)","Muestra de espesor conocido"],
+            ["Contacto trasero de aluminio y aleado","verificacion","Uniformidad; resistencia de contacto","Criterio escrito; estructura de prueba"],
+            ["Contacto frontal: fotolitografía, evaporación y lift-off","verificacion","Ancho de dedos y espesor","Microscopio y perfilómetro calibrados"],
+            ["Recocido de contactos","calibracion","Perfil térmico del horno","Termocupla de perfil calibrada"],
+            ["Definición del área de la celda","verificacion","Área de cada celda","Patrón de medida"],
+            ["Medición I-V y eficiencia cuántica","validacion","Isc, Voc, FF, eficiencia; celda testigo en cada sesión","Simulador clasificado (IEC 60904-9) y celda de referencia calibrada por un laboratorio acreditado"]]},
+   "csi-perc-prod":{nombre:"Celda de silicio PERC",escala:"produccion",tecnologia:"Silicio cristalino PERC",entrada:"Wafers de silicio",salida:"Celdas clasificadas por potencia",
+     desc:"Ruta típica de producción. A escala de laboratorio cambian varios pasos (metalización, cocción).",
+     pasos:[["Recepción e inspección de wafers","verificacion","Resistividad, espesor, tiempo de vida","Certificado del proveedor y muestra propia"],
+            ["Texturizado alcalino","verificacion","Reflectancia; pérdida de masa","Patrón de reflectancia; balanza calibrada"],
+            ["Difusión del emisor (POCl₃)","verificacion","Resistencia de lámina","Oblea patrón"],
+            ["Aislamiento de bordes y remoción del vidrio de fósforo","verificacion","Remoción verificada","Criterio escrito"],
+            ["Pasivado trasero (AlOx + SiNx)","verificacion","Espesor; tiempo de vida","Muestra patrón; referencia del equipo"],
+            ["Antirreflejo frontal (SiNx)","verificacion","Espesor e índice","Muestra de espesor conocido"],
+            ["Apertura láser trasera","verificacion","Geometría de la apertura","Retícula calibrada"],
+            ["Serigrafía (Ag frontal, Al trasero)","verificacion","Peso de pasta; ancho de dedos","Balanza y microscopio calibrados"],
+            ["Cocción","calibracion","Perfil térmico","Termocupla de perfil calibrada"],
+            ["Medición I-V y clasificación","validacion","Isc, Voc, FF, eficiencia","Simulador clasificado y celda de referencia trazable"]]},
+   "modulo-prod":{nombre:"Armado de módulo fotovoltaico",escala:"produccion",tecnologia:"Módulo de silicio cristalino",entrada:"Celdas clasificadas",salida:"Módulos medidos",
+     desc:"Ruta típica de armado de módulos a partir de celdas.",
+     pasos:[["Recepción y clasificación de celdas","verificacion","Clase de potencia; inspección visual","Informe de medición del proveedor"],
+            ["Interconexión de celdas (cintas)","verificacion","Resistencia de la unión; adherencia","Ensayo de tracción con dinamómetro calibrado"],
+            ["Armado de capas (vidrio, encapsulante, celdas, encapsulante, lámina trasera)","verificacion","Alineación y orden de capas","Criterio escrito"],
+            ["Inspección por electroluminiscencia antes del laminado","verificacion","Fisuras y celdas defectuosas","Imágenes patrón de defectos"],
+            ["Laminado","calibracion","Temperatura y presión del ciclo","Sensores calibrados"],
+            ["Recorte, marco y caja de conexiones","verificacion","Montaje y sellado","Criterio escrito"],
+            ["Medición I-V del módulo","validacion","Potencia en condiciones estándar","Simulador de módulos y módulo de referencia trazable"],
+            ["Ensayo de aislación","verificacion","Resistencia de aislación","Equipo de ensayo calibrado; IEC 61215/61730"]]},
+   "sistema-lab":{nombre:"Armado e integración de un sistema de instrumentos",escala:"laboratorio",tecnologia:"Instrumentación, electrónica y software",entrada:"Componentes e instrumentos",salida:"Sistema integrado y validado",
+     desc:"Para sistemas como sincronizadores o montajes de medición: no es una celda, pero también tiene ruta.",
+     pasos:[["Especificar interfaces entre instrumentos","verificacion","Señales, niveles, tiempos","Hojas de datos de cada instrumento"],
+            ["Adquirir y recibir componentes","verificacion","Componentes según la lista de materiales","Lista de materiales aprobada"],
+            ["Armar el hardware","verificacion","Continuidad y aislación","Multímetro calibrado"],
+            ["Programar y versionar el software","verificacion","Versión instalada","Repositorio con versiones"],
+            ["Integrar el sistema","verificacion","Funciones una por una","Lista de funciones con criterio"],
+            ["Calibrar el sistema","calibracion","Magnitud principal (tiempo, energía, longitud de onda…)","Patrón trazable"],
+            ["Validar con una muestra de referencia","validacion","Resultado sobre una muestra conocida","Muestra o base de datos de referencia"]]}
+  };
+
+  // ------------------------------------------------------------------ estado
+  const ORIG=JSON.parse(document.getElementById("datos").textContent);
+  let D,KEY,view="proyecto",filtO="",printAll=false;
+  const $=id=>document.getElementById(id);
+  let pref={papel:"A4"};
+  try{const ps=JSON.parse(localStorage.getItem("dide-flujo-pref")||"null");if(ps)pref=Object.assign(pref,ps);}catch(e){}
+  function savePref(){try{localStorage.setItem("dide-flujo-pref",JSON.stringify(pref));}catch(e){}}
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  function load(){KEY="dide-flujo-"+(ORIG.doc.codigo||"x");D=clone(ORIG);try{const s=localStorage.getItem(KEY);if(s)D=JSON.parse(s);}catch(e){}normalize();}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}}
+  function normalize(){D.doc=D.doc||{};D.etapas=D.etapas||[];D.nodos=D.nodos||[];D.rutas=D.rutas||[];
+    D.nodos.forEach(n=>{n.padre=n.padre||"";n.tipo=TIPOS[n.tipo]?n.tipo:"proceso";if(n.control&&!CTL[n.control.tipo])n.control.tipo="verificacion";});
+    D.rutas.forEach(r=>{r.pasos=r.pasos||[];r.pasos.forEach(p=>{p.pi=PI[p.pi]?p.pi:"sin_definir";p.estado=p.estado==="congelado"?"congelado":"desarrollo";});});
+    fillAcr(false);}
+  let seq=Date.now();const uid=p=>p+(seq++).toString(36);
+
+  // ------------------------------------------------------------------ utilidades de texto
+  const norm=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  function wrap(s,n){const w=String(s||"").split(/\s+/).filter(Boolean),out=[];let cur="";
+    w.forEach(x=>{while(x.length>n){if(cur){out.push(cur);cur="";}out.push(x.slice(0,n-1)+"-");x=x.slice(n-1);}
+      if((cur+" "+x).trim().length>n){if(cur)out.push(cur);cur=x;}else cur=(cur+" "+x).trim();});
+    if(cur)out.push(cur);return out.length?out:[""];}
+  const trunc=(s,n)=>s.length>n?s.slice(0,n-1)+"…":s;
+  const strip=s=>String(s||"").replace(/\*\*/g,"").replace(/`/g,"").replace(/\s+/g," ").trim();
+  function short(s,n){s=strip(s);if(s.length<=n)return s;const c=s.slice(0,n);const i=c.lastIndexOf(" ");return (i>n*0.6?c.slice(0,i):c)+"…";}
+  const cssStr=s=>'"'+String(s||"").replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/[\r\n]+/g," ")+'"';
+  function svgEl(tag,a,txt){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;return e;}
+  function h(tag,a,txt){const e=document.createElement(tag);if(a)for(const k in a){if(k==="class")e.className=a[k];else e.setAttribute(k,a[k]);}if(txt!=null)e.textContent=txt;return e;}
+  const origenes=n=>String(n.origen||"").split(/\s*[,;]\s*/).filter(Boolean);
+
+  // ------------------------------------------------------------------ estructura del árbol
+  const byId=id=>D.nodos.find(n=>n.id===id);
+  const kids=id=>D.nodos.filter(n=>n.padre===id);
+  function depth(n){let d=0,p=n;const seen=new Set();while(p&&p.padre&&!seen.has(p.id)){seen.add(p.id);p=byId(p.padre);if(p)d++;}return d;}
+  function dfs(etapa){const out=[];const visit=(n,d)=>{out.push({n,d});kids(n.id).filter(k=>k.etapa===etapa).forEach(k=>visit(k,d+1));};
+    D.nodos.filter(n=>n.etapa===etapa&&(!n.padre||!byId(n.padre)||byId(n.padre).etapa!==etapa)).forEach(n=>visit(n,0));return out;}
+  function allOrdered(){const out=[];D.etapas.forEach(e=>dfs(e.id).forEach(x=>out.push(x)));return out;}
+
+  // ------------------------------------------------------------------ acrónimos (convención α)
+  const VOC=new Set("aeiou".split(""));
+  function acrPropose(text,prefix,used){
+    const words=norm(text).replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w&&!STOP.has(w));
+    const cands=[];
+    words.forEach((w,wi)=>{const c=w.split("").filter(ch=>/[a-z]/.test(ch)&&!VOC.has(ch));
+      if(c.length>=3){cands.push(c[0]+c[1]+c[2]);for(let i=3;i<c.length;i++){cands.push(c[0]+c[1]+c[i]);cands.push(c[0]+c[2]+c[i]);}}
+      if(wi===0&&words[1]){const c2=words[1].split("").filter(ch=>/[a-z]/.test(ch)&&!VOC.has(ch));if(c.length&&c2.length>=2)cands.push(c[0]+c2[0]+c2[1]);}});
+    for(const c of cands){const a=(prefix?prefix+".":"")+c;if(!used.has(a))return{acr:a,forzado:false};}
+    const base=(words.join("").replace(/[^a-z]/g,"")+"xxx").slice(0,3);let a=(prefix?prefix+".":"")+base,i=2;
+    while(used.has(a)){a=(prefix?prefix+".":"")+base.slice(0,2)+i;i++;}
+    return{acr:a,forzado:true};}
+  function parentAcr(n){if(n.padre){const p=byId(n.padre);if(p&&p.acr)return p.acr;}const e=D.etapas.find(x=>x.id===n.etapa);return e?e.id:"";}
+  function fillAcr(force){
+    const used=new Set();D.etapas.forEach(e=>used.add(e.id));
+    D.nodos.forEach(n=>{if(!force&&n.acr)used.add(n.acr);});
+    allOrdered().forEach(({n})=>{if(SIN_ACR.has(n.tipo)){if(force)n.acr="";return;}
+      if(n.acr&&!force)return;const r=acrPropose(n.texto,parentAcr(n),used);n.acr=r.acr;n.acrForzado=r.forzado;used.add(r.acr);});
+    D.rutas.forEach(r=>{if(!r.acr||force){const en=D.nodos.find(n=>n.tipo==="enlace"&&n.ruta===r.id);const pre=en?parentAcr(en):"mpl";
+        const x=acrPropose("ruta "+(r.nombre||""),pre,used);r.acr=x.acr;used.add(x.acr);}else used.add(r.acr);
+      r.pasos.forEach(p=>{if(p.acr&&!force){used.add(p.acr);return;}const x=acrPropose(p.texto,r.acr,used);p.acr=x.acr;p.acrForzado=x.forzado;used.add(x.acr);});});
+  }
+
+  // ------------------------------------------------------------------ reglas: clasificador por palabras clave
+  const R_CAL=/calibr|metrolog|metodo de medicion|metodos de medicion|trazabil|patron/;
+  const R_VLD=/valid|ensay|certific|calific|verific|medir|medicion|caracteriz|prueba|probar|testear|degradac|en campo|ciclo de vida|monitore/;
+  const R_PLN=/estudi|mercado|defin|elegi|eleccion|planific|presupuest|financ|linea base|patente|libertad de operacion|busqueda|trl|cronograma|relev/;
+  const R_DRQ=/especific|requisit|norma|permiso|inventari|seguridad|criterio|arbol de documentos/;
+  const R_PMV=/manual|informe|entreg|acuerdo|pmv|transfer|licenc|publica/;
+  const R_MPL=/fabric|armar|arma |constru|implement|instal|montar|disen|program|lote|proceso|texturiz|difusi|deposit|serigraf|coccion|evapor|limpi|ruta|hoja de ruta|identific|integr|formar|formacion|tratamiento/;
+  const R_DOC=/manual|informe|documento|\bpid\b|plan de|acuerdo|declaracion|amfe|fmea/;
+  function ctlTipo(t){if(R_CAL.test(t))return"calibracion";if(/valid/.test(t))return"validacion";if(/certific|calific|ensay|degradac/.test(t))return"calificacion";return"verificacion";}
+  function classify(texto){
+    const t=norm(texto);let etapa=null,control=null;
+    if(R_CAL.test(t)){etapa="mpl";control="calibracion";}
+    else if(R_VLD.test(t)){etapa="vld";control=ctlTipo(t);}
+    else if(R_PLN.test(t))etapa="pln";
+    else if(R_DRQ.test(t))etapa="drq";
+    else if(R_PMV.test(t))etapa="pmv";
+    else if(R_MPL.test(t))etapa="mpl";
+    const tipo=/\?\s*$/.test(texto)?"decision":R_DOC.test(t)?"documento":etapa==="drq"?"datos":"proceso";
+    return{etapa:etapa||"pln",sinEtapa:!etapa,tipo,control};
+  }
+  const PARECE_MEDICION=/medi|caracteriz|ensay|calibr|verific|valid|inspecc|control de|resistencia de|espesor|eficiencia|reflectancia/;
+
+  // ------------------------------------------------------------------ preguntas socráticas
+  function preguntas(){
+    const Q=[];const nombre=n=>"«"+trunc(n.texto||"(sin texto)",60)+"»";
+    const etapasConNodos=new Set(D.nodos.map(n=>n.etapa));
+    D.etapas.forEach(e=>{if(!etapasConNodos.has(e.id))Q.push({t:"La etapa "+e.nombre+" está vacía. "+(e.id==="vld"?"¿Cómo se va a demostrar que el resultado sirve? La validación es lo que respalda todo lo que sigue.":"¿Qué va en ella?")});});
+    allOrdered().forEach(({n,d})=>{const ref={k:"n",id:n.id};
+      if(n.sinEtapa)Q.push({t:nombre(n)+" no tiene una etapa clara: ¿en cuál va?",ref});
+      if(!n.origen)Q.push({t:nombre(n)+": ¿quién lo propuso?",ref});
+      if(d>2)Q.push({t:nombre(n)+" está a más de 4 niveles: conviene pasarlo a otro diagrama con un enlace.",ref});
+      if((n.tipo==="decision"||n.tipo==="revision")&&(!n.si||!n.no))Q.push({t:nombre(n)+": ¿qué pasa si la respuesta es SÍ y qué si es NO?",ref});
+      if(n.tipo==="enlace"&&!D.rutas.some(r=>r.id===n.ruta))Q.push({t:nombre(n)+": ¿a qué ruta de fabricación lleva?",ref});
+      if(n.acrForzado)Q.push({t:"El acrónimo «"+n.acr+"» de "+nombre(n)+" quedó forzado: revisalo.",ref});
+      if(n.control){const c=CTL[n.control.tipo];
+        if(!n.control.referencia)Q.push({t:nombre(n)+" ("+c.t.toLowerCase()+"): "+c.q+(n.control.pista?" Pista: "+n.control.pista+".":""),ref});
+        if(!n.control.criterio)Q.push({t:nombre(n)+": ¿cuál es el criterio de aceptación?",ref});
+        if(!n.control.reaccion)Q.push({t:nombre(n)+": ¿qué se hace si no cumple?",ref});
+        if(n.control.tipo==="calibracion"&&n.etapa==="vld")Q.push({t:nombre(n)+" es una calibración: conviene hacerla antes de fabricar o de medir, no al final.",ref});
+      }else if(n.tipo==="proceso"&&PARECE_MEDICION.test(norm(n.texto)))Q.push({t:nombre(n)+" parece una medición: ¿le agregamos un control?",ref,act:"ctl"});
+    });
+    duplicados().forEach(([a,b])=>Q.push({t:"¿"+nombre(a)+" ["+(a.origen||"?")+"] y "+nombre(b)+" ["+(b.origen||"?")+"] son el mismo paso?",ref:{k:"n",id:a.id},act:"unir",b:b.id}));
+    D.rutas.forEach(r=>r.pasos.forEach((p,i)=>{const ref={k:"p",r:r.id,id:p.id},nm=r.id+" · paso "+(i+1)+" «"+trunc(p.texto,50)+"»";
+      if(!p.control)Q.push({t:nm+": ¿qué se controla al terminarlo?",ref});
+      else{const c=CTL[p.control.tipo];
+        if(!p.control.referencia)Q.push({t:nm+" ("+c.t.toLowerCase()+"): "+c.q+(p.control.pista?" Pista: "+p.control.pista+".":""),ref});
+        if(!p.control.criterio)Q.push({t:nm+": ¿cuál es el criterio de aceptación?",ref});
+        if(!p.control.reaccion)Q.push({t:nm+": ¿qué se hace si no cumple?",ref});}
+      if(p.pi==="sin_definir")Q.push({t:nm+": ¿es público, secreto o candidato a patente? Regla práctica: si se puede ver en el dispositivo terminado, conviene patentar; si sólo vive en los parámetros del proceso, conviene secreto.",ref});
+      if(p.estado==="congelado"&&!(p.control&&p.control.referencia&&p.control.criterio))Q.push({t:nm+" está congelado pero su control está incompleto.",ref});
+    }));
+    return Q;
+  }
+  function tokens(s){return new Set(norm(s).replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)));}
+  function duplicados(){const L=D.nodos.filter(n=>!SIN_ACR.has(n.tipo)),out=[];
+    for(let i=0;i<L.length;i++)for(let j=i+1;j<L.length;j++){const a=tokens(L[i].texto),b=tokens(L[j].texto);if(a.size<2||b.size<2)continue;
+      let inter=0;a.forEach(x=>{if(b.has(x))inter++;});const jac=inter/(a.size+b.size-inter);if(jac>=0.5)out.push([L[i],L[j]]);}
+    return out;}
+  function unir(aId,bId){const a=byId(aId),b=byId(bId);if(!a||!b)return;
+    const o=new Set(origenes(a).concat(origenes(b)));a.origen=Array.from(o).join(", ");
+    if(b.nota)a.nota=(a.nota?a.nota+" · ":"")+b.nota;if(!a.control&&b.control)a.control=b.control;
+    kids(b.id).forEach(k=>k.padre=a.id);D.nodos=D.nodos.filter(n=>n.id!==b.id);}
+
+  // ------------------------------------------------------------------ dibujo: flujo del proyecto
+  function shape(g,tipo,x,y,w,hh){
+    let s;
+    if(tipo==="terminal")s=svgEl("rect",{x,y,width:w,height:hh,rx:Math.min(hh/2,18)});
+    else if(tipo==="decision")s=svgEl("polygon",{points:[x+w/2,y,x+w,y+hh/2,x+w/2,y+hh,x,y+hh/2].join(" ")});
+    else if(tipo==="datos")s=svgEl("polygon",{points:[x+12,y,x+w,y,x+w-12,y+hh,x,y+hh].join(" ")});
+    else if(tipo==="documento")s=svgEl("path",{d:"M"+x+" "+y+"H"+(x+w)+"V"+(y+hh-6)+"Q"+(x+w*0.75)+" "+(y+hh-15)+" "+(x+w/2)+" "+(y+hh-6)+"T"+x+" "+(y+hh-6)+"Z"});
+    else if(tipo==="enlace")s=svgEl("ellipse",{cx:x+w/2,cy:y+hh/2,rx:w/2,ry:hh/2});
+    else if(tipo==="revision")s=svgEl("polygon",{points:[x+12,y,x+w-12,y,x+w,y+hh/2,x+w-12,y+hh,x+12,y+hh,x,y+hh/2].join(" ")});
+    else s=svgEl("rect",{x,y,width:w,height:hh});
+    s.setAttribute("class","sh");g.appendChild(s);
+  }
+  function badge(g,cx,cy,c){const k=CTL[c.tipo];const inc=!c.referencia||!c.criterio;
+    if(inc)g.appendChild(svgEl("circle",{cx,cy,r:12.5,fill:"none",stroke:"#b58500","stroke-width":2,"stroke-dasharray":"3 2"}));
+    g.appendChild(svgEl("circle",{cx,cy,r:9,fill:k.c,stroke:"#fff","stroke-width":1.5}));
+    g.appendChild(svgEl("text",{x:cx,y:cy+3.6,"font-size":10,"font-weight":700,fill:"#fff","text-anchor":"middle"},k.l));}
+  function lines(g,ls,cx,y0,fs,lh,cls){const t=svgEl("text",{x:cx,y:y0,"class":cls||"tx"});t.style.fontSize=fs+"px";
+    ls.forEach((l,i)=>t.appendChild(svgEl("tspan",{x:cx,dy:i?lh:0},l)));g.appendChild(t);}
+  function arrowDefs(svg){const d=svgEl("defs",{});const m=svgEl("marker",{id:"ah-"+svg.id,viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:7,markerHeight:7,orient:"auto-start-reverse"});
+    m.appendChild(svgEl("path",{d:"M0 0L10 5L0 10z",fill:"#1b1a16"}));d.appendChild(m);svg.appendChild(d);return "url(#ah-"+svg.id+")";}
+  function caption(n){const p=[];if(n.acr)p.push(n.acr);if(n.origen)p.push("["+n.origen+"]");
+    if(n.tipo==="decision"||n.tipo==="revision"){if(n.si)p.push("SÍ → "+n.si);if(n.no)p.push("NO → "+n.no);}
+    if(n.tipo==="enlace"&&n.ruta)p.push("⇒ "+n.ruta);return p.join(" · ");}
+  function dimmed(n){return filtO&&!origenes(n).includes(filtO);}
+
+  function renderProyecto(){
+    const svg=$("svg-p");svg.innerHTML="";const mk=arrowDefs(svg);
+    const E=D.etapas,COLW=250,GAP=38,PAD=16,HH=46,FS=12.5,LH=15.5;
+    const gC=svgEl("g",{}),gN=svgEl("g",{});svg.appendChild(gC);svg.appendChild(gN);
+    let maxY=0;const pos={};
+    E.forEach((e,i)=>{const x0=PAD+i*(COLW+GAP);
+      const ge=svgEl("g",{"class":"etapa"});ge.appendChild(svgEl("rect",{x:x0,y:PAD,width:COLW,height:HH,rx:6}));
+      const el=wrap(e.nombre.toUpperCase(),26).slice(0,2);lines(ge,el,x0+COLW/2,PAD+HH/2+5-(el.length-1)*7,13,14,"");gN.appendChild(ge);
+      if(i<E.length-1)gC.appendChild(svgEl("path",{d:"M"+(x0+COLW+4)+" "+(PAD+HH/2)+"H"+(x0+COLW+GAP-4),"class":"flow","marker-end":mk}));
+      let y=PAD+HH+20;
+      dfs(e.id).forEach(({n,d})=>{const dd=Math.min(d,2),x=x0+14+dd*22,w=COLW-14-dd*22;
+        const dia=n.tipo==="decision",inner=dia?w*0.6:(n.tipo==="datos"||n.tipo==="revision"||n.tipo==="enlace"?w-34:w-22);
+        const ch=Math.max(8,Math.floor(inner/(FS*0.54)));let ls=wrap(n.texto||"(sin texto)",ch);
+        if(ls.length>4){ls=ls.slice(0,4);ls[3]=trunc(ls[3]+" …",ch);}
+        const hh=Math.max(dia?60:32,ls.length*LH+(dia?30:13));const cap=caption(n);
+        pos[n.id]={x,y,w,hh};
+        const par=n.padre&&pos[n.padre];const sx=par?par.x+10:x0+8,sy=par?par.y+par.hh:PAD+HH;
+        gC.appendChild(svgEl("path",{d:"M"+sx+" "+sy+"V"+(y+hh/2)+"H"+(x-2),"class":"conn","marker-end":mk}));
+        const g=svgEl("g",{"class":"nd t-"+n.tipo+(dimmed(n)?" dim":""),tabindex:0,role:"button","aria-label":TIPOS[n.tipo]+": "+(n.texto||"")});
+        shape(g,n.tipo,x,y,w,hh);
+        lines(g,ls,x+w/2,y+(hh-ls.length*LH)/2+FS*0.85,FS,LH);
+        if(n.control)badge(g,x+w-3,y+3,n.control);
+        // el pie va a la derecha: a la izquierda baja la línea que une a los hijos
+        if(cap){const t=svgEl("text",{x:x+w-2,y:y+hh+11,"class":"cap","font-size":9.5,"text-anchor":"end"},trunc(cap,Math.floor((w-14)/5.4)));g.appendChild(t);}
+        bind(g,n,()=>openNodo(n));gN.appendChild(g);
+        y+=hh+(cap?16:0)+12;});
+      maxY=Math.max(maxY,y);});
+    const W=PAD*2+E.length*COLW+Math.max(0,E.length-1)*GAP,H=Math.max(maxY+PAD,200);
+    svg.setAttribute("viewBox","0 0 "+W+" "+H);svg.setAttribute("width",W);svg.setAttribute("height",H);
+    svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+  }
+
+  // ------------------------------------------------------------------ dibujo: ruta de fabricación
+  function renderRutaSVG(r,svg){
+    svg.innerHTML="";const mk=arrowDefs(svg);
+    const BW=210,GX=48,GY=54,PER=5,PAD=18,FS=12,LH=14.5;
+    const items=[{k:"in",texto:"Entrada: "+(r.entrada||"—")}].concat(r.pasos.map((p,i)=>({k:"p",p,i}))).concat([{k:"out",texto:"Salida: "+(r.salida||"—")}]);
+    const meta=items.map(it=>{const txt=it.k==="p"?(it.i+1)+". "+(it.p.texto||""):it.texto;let ls=wrap(txt,Math.floor((BW-26)/(FS*0.54)));if(ls.length>4){ls=ls.slice(0,4);ls[3]=trunc(ls[3]+" …",30);}
+      return{ls,hh:it.k==="p"?Math.max(66,ls.length*LH+38):Math.max(44,ls.length*LH+18)};});
+    const rows=Math.ceil(items.length/PER),rowH=[];for(let r0=0;r0<rows;r0++)rowH.push(Math.max.apply(null,meta.slice(r0*PER,r0*PER+PER).map(m=>m.hh)));
+    const P=items.map((it,i)=>{const row=Math.floor(i/PER),col=i%PER;let y=PAD;for(let k=0;k<row;k++)y+=rowH[k]+GY;return{x:PAD+col*(BW+GX),y,row};});
+    const gC=svgEl("g",{}),gN=svgEl("g",{});svg.appendChild(gC);svg.appendChild(gN);
+    items.forEach((it,i)=>{const {x,y}=P[i],m=meta[i];
+      if(i>0){const a=P[i-1],ma=meta[i-1];
+        if(a.row===P[i].row)gC.appendChild(svgEl("path",{d:"M"+(a.x+BW)+" "+(a.y+24)+"H"+(x-3),"class":"flow","marker-end":mk}));
+        else{const my=a.y+rowH[a.row]+GY/2;gC.appendChild(svgEl("path",{d:"M"+(a.x+BW/2)+" "+(a.y+ma.hh)+"V"+my+"H"+(x+BW/2)+"V"+(y-3),"class":"flow","marker-end":mk}));}}
+      if(it.k!=="p"){const g=svgEl("g",{"class":"nd t-terminal"});shape(g,"terminal",x,y,BW,m.hh);lines(g,m.ls,x+BW/2,y+(m.hh-m.ls.length*LH)/2+FS*0.85,FS,LH);gN.appendChild(g);return;}
+      const p=it.p,g=svgEl("g",{"class":"nd paso "+p.estado+(dimmed(p)?" dim":""),tabindex:0,role:"button","aria-label":"Paso "+(it.i+1)+": "+p.texto});
+      shape(g,"proceso",x,y,BW,m.hh);
+      const t=svgEl("text",{x:x+10,y:y+16,"class":"txl"});t.style.fontSize=FS+"px";
+      m.ls.forEach((l,j)=>t.appendChild(svgEl("tspan",{x:x+10,dy:j?LH:0},l)));g.appendChild(t);
+      const pi=PI[p.pi];g.appendChild(svgEl("circle",{cx:x+14,cy:y+m.hh-12,r:5,fill:p.pi==="sin_definir"?"#fff":pi.c,stroke:pi.c,"stroke-width":1.5}));
+      g.appendChild(svgEl("text",{x:x+23,y:y+m.hh-8.5,"font-size":10,fill:"#615d54"},"PI: "+pi.t.toLowerCase()+(p.experimento?" · EXP":"")+(p.estado==="congelado"?" · congelado":"")));
+      if(p.control)badge(g,x+BW-3,y+3,p.control);
+      bind(g,p,()=>openPaso(r,p));gN.appendChild(g);});
+    const W=PAD*2+Math.min(items.length,PER)*BW+(Math.min(items.length,PER)-1)*GX;let H=PAD*2;rowH.forEach(v=>H+=v);H+=(rows-1)*GY;
+    svg.setAttribute("viewBox","0 0 "+W+" "+H);svg.setAttribute("width",W);svg.setAttribute("height",H);svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+  }
+  function renderTablaRuta(r,tbody){tbody.innerHTML="";
+    r.pasos.forEach((p,i)=>{const c=p.control||{};const tr=h("tr");
+      const cells=[String(i+1),p.texto,p.control?CTL[c.tipo].t:"",c.que||"",c.referencia||"",c.criterio||"",c.reaccion||"",PI[p.pi].t,(p.estado==="congelado"?"Congelado":"En desarrollo")+(p.experimento?" · experimento: "+p.experimento:""),p.origen||""];
+      cells.forEach((v,j)=>{const td=h("td",null,v||(j>=2&&j<=6?"¿?":""));if(!v&&j>=2&&j<=6)td.className="falta";tr.appendChild(td);});
+      tr.addEventListener("click",()=>openPaso(r,p));tbody.appendChild(tr);});}
+
+  // ------------------------------------------------------------------ vistas
+  function rotulo(container,label){container.innerHTML="";container.appendChild($("tpl-rot").content.cloneNode(true));container.querySelector(".rot-diag").textContent=label;}
+  function renderRutas(){
+    const box=$("v-rutas");box.innerHTML="";
+    D.rutas.forEach(r=>{
+      const s=h("section",{"class":"sheet view","data-view":"ruta:"+r.id,"aria-label":"Ruta "+r.nombre});
+      const hd=h("header",{"class":"run"});const a=h("span");a.appendChild(h("b",{"data-f":"codigo"}));a.appendChild(document.createTextNode(" · Ruta de fabricación ("+r.id+") · "+(r.nombre||"")+" · escala: "+(r.escala==="produccion"?"producción":"laboratorio")));
+      const b=h("span");b.innerHTML='Versión <span data-f="version"></span> · <span data-f="fecha"></span>';hd.appendChild(a);hd.appendChild(b);s.appendChild(hd);
+      const dg=h("div",{"class":"diagram"});const svg=svgEl("svg",{id:"svg-"+r.id,role:"img","aria-label":"Ruta "+r.nombre});dg.appendChild(svg);s.appendChild(dg);
+      const rr=h("div",{"class":"rot-row"});s.appendChild(rr);rotulo(rr,"Ruta de fabricación ("+r.id+") · "+(r.nombre||""));
+      box.appendChild(s);renderRutaSVG(r,svg);
+      const t=h("section",{"class":"tabla view","data-view":"ruta:"+r.id,"aria-label":"Controles de "+r.nombre});
+      t.appendChild(h("h2",null,r.id+" · Controles de "+(r.nombre||"")+" — "+(r.tecnologia||"")));
+      const tb=h("table");tb.innerHTML="<thead><tr><th>#</th><th>Proceso unitario</th><th>Tipo de control</th><th>Qué se controla</th><th>Referencia</th><th>Criterio</th><th>Plan de reacción</th><th>PI</th><th>Estado</th><th>Origen</th></tr></thead>";
+      const tbody=h("tbody");tb.appendChild(tbody);t.appendChild(tb);box.appendChild(t);renderTablaRuta(r,tbody);});
+  }
+  function renderDic(){const tb=$("dic-body");tb.innerHTML="";
+    const row=(a,niv,pad,nom,tipo,ori,fn)=>{const tr=h("tr");[a,niv,pad,nom,tipo,ori].forEach(v=>tr.appendChild(h("td",null,v)));if(fn)tr.addEventListener("click",fn);tb.appendChild(tr);};
+    row(D.doc.acronimo||"",0,"",D.doc.titulo||"","Proyecto","");
+    D.etapas.forEach(e=>{row(e.id,1,D.doc.acronimo||"",e.nombre,"Etapa","");
+      dfs(e.id).forEach(({n,d})=>{if(SIN_ACR.has(n.tipo)&&n.tipo!=="enlace")return;
+        if(n.tipo==="enlace"){const r=D.rutas.find(x=>x.id===n.ruta);if(!r)return;
+          row(r.acr,d+2,parentAcr(n),"Ruta de fabricación: "+r.nombre,"Ruta",n.origen||"",()=>show("ruta:"+r.id));
+          r.pasos.forEach(p=>row(p.acr,d+3,r.acr,p.texto,"Proceso unitario",p.origen||"",()=>openPaso(r,p)));return;}
+        row(n.acr,d+2,parentAcr(n),n.texto,TIPOS[n.tipo].split(" (")[0],n.origen||"",()=>openNodo(n));});});}
+  function renderTabs(){const nav=$("tabs");nav.innerHTML="";
+    const add=(v,txt)=>{const b=h("button",{type:"button",role:"tab","aria-selected":String(view===v)},txt);b.addEventListener("click",()=>show(v));nav.appendChild(b);};
+    add("proyecto","Flujo del proyecto (DP-01)");D.rutas.forEach(r=>add("ruta:"+r.id,"Ruta "+r.id+" · "+trunc(r.nombre||"",34)));add("dic","Diccionario");
+    const rt=$("ruta-tools");rt.innerHTML="";
+    if(view.startsWith("ruta:")){const r=D.rutas.find(x=>"ruta:"+x.id===view);if(r){
+      const b1=h("button",{type:"button"},"Datos de la ruta");b1.addEventListener("click",()=>openRuta(r));rt.appendChild(b1);
+      const b2=h("button",{type:"button","class":"only-edit"},"+ Paso");b2.addEventListener("click",()=>openPaso(r,null));rt.appendChild(document.createTextNode(" "));rt.appendChild(b2);}}}
+  function show(v){view=v;if(v.startsWith("ruta:")&&!D.rutas.some(r=>"ruta:"+r.id===v))view="proyecto";
+    document.querySelectorAll(".view").forEach(s=>s.classList.toggle("current",s.dataset.view===view));renderTabs();}
+  function renderDoc(){
+    document.querySelectorAll("[data-f]").forEach(e=>{if(document.activeElement!==e)e.textContent=D.doc[e.dataset.f]||"";});
+    const s=SEMA[D.doc.semaforo]||SEMA.rojo;$("sema").style.borderColor=s.h;$("sema-dot").style.background=s.h;$("sema-txt").textContent=D.doc.semaforo||"rojo";$("sema-txt").style.color=s.h;
+    $("sema-desc").textContent=s.d;$("sema-sel").value=D.doc.semaforo||"rojo";
+    document.querySelectorAll(".sema-name").forEach(e=>{e.textContent=(D.doc.semaforo||"rojo")+" — "+s.d;e.style.color=s.h;});
+    document.title="Flujo del proyecto — "+(D.doc.titulo||"");applyPaper();}
+  function renderFilters(){const f=$("fl-o"),v=f.value;f.innerHTML='<option value="">todos</option>';
+    const all=new Set();D.nodos.forEach(n=>origenes(n).forEach(o=>all.add(o)));D.rutas.forEach(r=>r.pasos.forEach(p=>origenes(p).forEach(o=>all.add(o))));
+    Array.from(all).sort().forEach(o=>f.appendChild(h("option",{value:o},o)));f.value=all.has(v)?v:"";filtO=f.value;}
+  function renderPreguntas(){const box=$("preguntas"),Q=preguntas();box.innerHTML="";
+    box.appendChild(h("h2",null,"Preguntas para el equipo ("+Q.length+")"));
+    if(!Q.length){box.appendChild(h("p",{"class":"hint"},"No quedan preguntas abiertas."));return;}
+    box.appendChild(h("p",{"class":"hint"},"La herramienta pregunta; las respuestas las da el equipo. Hacé clic en una pregunta para abrir el elemento."));
+    const ol=h("ol");Q.forEach(q=>{const li=h("li");
+      if(q.ref){const b=h("a",{href:"#"},q.t);b.addEventListener("click",ev=>{ev.preventDefault();openRef(q.ref);});li.appendChild(b);}else li.appendChild(document.createTextNode(q.t));
+      if(q.act==="unir"){const a=h("button",{type:"button","class":"act"},"Unir");a.addEventListener("click",()=>{unir(q.ref.id,q.b);save();renderAll();});li.appendChild(a);}
+      if(q.act==="ctl"){const a=h("button",{type:"button","class":"act"},"Agregar control");a.addEventListener("click",()=>{const n=byId(q.ref.id);n.control={tipo:ctlTipo(norm(n.texto)),que:n.texto,referencia:"",criterio:"",reaccion:"",resultado:""};save();renderAll();});li.appendChild(a);}
+      ol.appendChild(li);});box.appendChild(ol);}
+  function renderSintesis(){const box=$("sintesis");box.innerHTML="";box.appendChild(h("h2",null,"Síntesis (se calcula sola)"));
+    const ctl=D.nodos.filter(n=>n.control).map(n=>n.control).concat([].concat.apply([],D.rutas.map(r=>r.pasos.filter(p=>p.control).map(p=>p.control))));
+    const cnt={};Object.keys(CTL).forEach(k=>cnt[k]=ctl.filter(c=>c.tipo===k).length);const inc=ctl.filter(c=>!c.referencia||!c.criterio).length;
+    const add=t=>box.appendChild(h("p",{style:"margin:0 0 6px"},t));
+    add(D.nodos.length+" elementos en "+D.etapas.length+" etapas · "+D.rutas.length+" ruta(s) de fabricación.");
+    add("Controles: "+cnt.calibracion+" calibraciones, "+cnt.verificacion+" verificaciones, "+cnt.validacion+" validaciones y "+cnt.calificacion+" calificaciones; "+inc+" incompletos (sin referencia o sin criterio).");
+    if(!D.nodos.some(n=>n.etapa==="vld"))add("Atención: la etapa Validación está vacía.");
+    D.rutas.forEach(r=>{const pc={};Object.keys(PI).forEach(k=>pc[k]=r.pasos.filter(p=>p.pi===k).length);
+      add(r.id+" ("+r.nombre+"): "+r.pasos.length+" pasos, "+r.pasos.filter(p=>p.estado==="congelado").length+" congelados, "+r.pasos.filter(p=>p.experimento).length+" en experimento. PI: "+pc.publico+" públicos, "+pc.secreto+" secretos, "+pc.patente+" candidatos a patente, "+pc.sin_definir+" sin definir.");});
+    const ori={};D.nodos.forEach(n=>origenes(n).forEach(o=>ori[o]=(ori[o]||0)+1));D.rutas.forEach(r=>r.pasos.forEach(p=>origenes(p).forEach(o=>ori[o]=(ori[o]||0)+1)));
+    const ks=Object.keys(ori).sort();if(ks.length)add("Aportes por origen: "+ks.map(k=>k+" "+ori[k]).join(" · ")+".");}
+  function renderAll(){normalize();renderDoc();renderFilters();renderProyecto();renderRutas();renderDic();renderDoc();renderPreguntas();renderSintesis();rotulo(document.querySelector("#v-proyecto .rot-row"),"Flujo del proyecto (DP-01)");renderDoc();show(view);bindDocFields();}
+
+  // ------------------------------------------------------------------ tooltip e interacción
+  function bind(g,obj,fn){g.addEventListener("click",fn);g.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();fn();}});
+    g.addEventListener("mousemove",ev=>tip(obj,ev));g.addEventListener("mouseleave",()=>{$("tip").style.display="none";});}
+  function tip(o,ev){const t=$("tip");t.innerHTML="";t.appendChild(h("b",null,o.texto||""));
+    const add=s=>{t.appendChild(h("br"));t.appendChild(document.createTextNode(s));};
+    if(o.origen)add("Origen: "+o.origen);if(o.nota)add(o.nota);
+    if(o.control){const c=o.control;add(CTL[c.tipo].t+": "+(c.que||"—"));add("Referencia: "+(c.referencia||"¿?")+" · Criterio: "+(c.criterio||"¿?"));}
+    t.style.display="block";t.style.left=Math.min(ev.clientX+14,window.innerWidth-360)+"px";t.style.top=(ev.clientY+14)+"px";}
+  function openRef(ref){if(ref.k==="n"){const n=byId(ref.id);if(n){show("proyecto");openNodo(n);}}else{const r=D.rutas.find(x=>x.id===ref.r);const p=r&&r.pasos.find(x=>x.id===ref.id);if(p){show("ruta:"+r.id);openPaso(r,p);}}}
+
+  // ------------------------------------------------------------------ diálogos
+  const dlg=$("dlg");
+  function dlgOpen(title){$("dlg-t").textContent=title;$("dlg-b").innerHTML="";$("dlg-b").className="dlg-b";$("dlg-f").innerHTML="";if(!dlg.open)dlg.showModal();return $("dlg-b");}
+  function btn(t,cls,fn){const x=h("button",{type:"button"},t);if(cls)x.className=cls;x.addEventListener("click",fn);$("dlg-f").appendChild(x);return x;}
+  function field(parent,lbl,val,type,opts){const l=h("label",null,lbl);let i;
+    if(type==="select"){i=h("select");opts.forEach(o=>{const op=h("option",{value:o[0]},o[1]);i.appendChild(op);});i.value=val||opts[0][0];}
+    else if(type==="area"){i=h("textarea",{rows:2});i.value=val||"";}else{i=h("input",{type:"text"});i.value=val||"";}
+    l.appendChild(i);parent.appendChild(l);return i;}
+  function msg(title,text){const b=dlgOpen(title);b.appendChild(h("p",{style:"margin:0;white-space:pre-line"},text));btn("Cerrar","pri",()=>dlg.close());}
+  function controlFields(b,c){
+    const fs=h("fieldset");fs.appendChild(h("legend",null,"Control ✔"));b.appendChild(fs);
+    const on=h("label",{style:"display:flex;gap:6px;align-items:center;color:var(--ink)"});const ck=h("input",{type:"checkbox",style:"width:auto"});ck.checked=!!c;on.appendChild(ck);on.appendChild(document.createTextNode("Este elemento tiene un control (medición, calibración, verificación, validación o calificación)"));fs.appendChild(on);
+    const inner=h("div",{style:"display:grid;gap:8px"});fs.appendChild(inner);c=c||{};
+    const f={tipo:field(inner,"Tipo de control",c.tipo,"select",Object.keys(CTL).map(k=>[k,CTL[k].t])),
+      que:field(inner,"Qué se controla",c.que),referencia:field(inner,"Referencia (patrón, muestra conocida, especificación)",c.referencia),
+      criterio:field(inner,"Criterio de aceptación",c.criterio),reaccion:field(inner,"Plan de reacción (qué se hace si no cumple)",c.reaccion),
+      resultado:field(inner,"Resultado (cuando exista)",c.resultado)};
+    if(c.pista)f.referencia.placeholder="Pista: "+c.pista;
+    const sync=()=>{inner.style.display=ck.checked?"grid":"none";};ck.addEventListener("change",sync);sync();
+    return()=>ck.checked?{tipo:f.tipo.value,que:f.que.value.trim(),referencia:f.referencia.value.trim(),criterio:f.criterio.value.trim(),reaccion:f.reaccion.value.trim(),resultado:f.resultado.value.trim(),pista:c.pista||""}:null;}
+  function readOnly(b,rows){b.className="dlg-b ro";rows.forEach(r=>{if(!r[1])return;const d=h("div");d.appendChild(h("span",{"class":"k"},r[0]));d.appendChild(h("p",null,r[1]));b.appendChild(d);});}
+  const editing=()=>document.body.classList.contains("edit");
+  function setEdit(on){document.body.classList.toggle("edit",on);$("b-edit").setAttribute("aria-pressed",String(on));document.querySelectorAll("[data-f]").forEach(e=>e.contentEditable=on?"true":"false");}
+
+  function openNodo(n,etapa){
+    const isNew=!n;if(!editing()&&!isNew){const b=dlgOpen(n.texto||"Elemento");const c=n.control;
+      readOnly(b,[["Tipo",TIPOS[n.tipo]],["Etapa",(D.etapas.find(e=>e.id===n.etapa)||{}).nombre],["Acrónimo",n.acr],["Origen",n.origen],["Nota",n.nota],["SÍ →",n.si],["NO →",n.no],
+        ["Control",c?CTL[c.tipo].t+": "+(c.que||"—"):""],["Referencia",c?(c.referencia||"¿?"):""],["Criterio",c?(c.criterio||"¿?"):""],["Plan de reacción",c?(c.reaccion||"¿?"):""],["Resultado",c&&c.resultado]]);
+      if(n.tipo==="enlace"&&n.ruta)btn("Ir a la ruta "+n.ruta,"",()=>{dlg.close();show("ruta:"+n.ruta);});
+      btn("Editar","",()=>{setEdit(true);openNodo(n);});btn("Cerrar","pri",()=>dlg.close());return;}
+    n=n||{id:uid("n"),etapa:etapa||(D.etapas[0]||{}).id,padre:"",tipo:"proceso",texto:"",acr:"",origen:"",nota:""};
+    const b=dlgOpen(isNew?"Nuevo elemento":"Editar elemento");
+    const fEt=field(b,"Etapa",n.etapa,"select",D.etapas.map(e=>[e.id,e.nombre]));
+    const fPa=field(b,"Depende de (vacío = cuelga de la etapa)",n.padre,"select",[["","—"]]);
+    const fillPadres=()=>{fPa.innerHTML="";fPa.appendChild(h("option",{value:""},"—"));
+      const desc=new Set([n.id]);let grew=true;while(grew){grew=false;D.nodos.forEach(x=>{if(desc.has(x.padre)&&!desc.has(x.id)){desc.add(x.id);grew=true;}});}
+      dfs(fEt.value).forEach(({n:x,d})=>{if(desc.has(x.id)||d>=2)return;fPa.appendChild(h("option",{value:x.id},"  ".repeat(d)+trunc(x.texto,50)));});
+      fPa.value=Array.from(fPa.options).some(o=>o.value===n.padre)?n.padre:"";};
+    fEt.addEventListener("change",fillPadres);fillPadres();
+    const fTi=field(b,"Símbolo",n.tipo,"select",Object.keys(TIPOS).map(k=>[k,TIPOS[k]]));
+    const fTx=field(b,"Texto",n.texto,"area");
+    const r2=h("div",{"class":"row2"});b.appendChild(r2);const fAc=field(r2,"Acrónimo (convención α)",n.acr);const fOr=field(r2,"Origen (quién lo propuso)",n.origen);
+    const fNo=field(b,"Nota",n.nota,"area");
+    const r3=h("div",{"class":"row2"});b.appendChild(r3);const fSi=field(r3,"Si la respuesta es SÍ →",n.si);const fNO=field(r3,"Si la respuesta es NO →",n.no);
+    const fRu=field(b,"Ruta de fabricación a la que lleva",n.ruta,"select",[["","—"]].concat(D.rutas.map(r=>[r.id,r.id+" · "+r.nombre])));
+    const sync=()=>{const t=fTi.value;r3.style.display=(t==="decision"||t==="revision")?"grid":"none";fRu.parentNode.style.display=t==="enlace"?"grid":"none";};fTi.addEventListener("change",sync);sync();
+    const getCtl=controlFields(b,n.control);
+    if(!isNew)btn("Borrar","del",()=>{kids(n.id).forEach(k=>k.padre=n.padre);D.nodos=D.nodos.filter(x=>x.id!==n.id);save();dlg.close();renderAll();});
+    if(!isNew){btn("↑","",()=>{move(D.nodos,n,-1);save();renderAll();});btn("↓","",()=>{move(D.nodos,n,1);save();renderAll();});}
+    btn("Cancelar","",()=>dlg.close());
+    btn("Guardar","pri",()=>{if(!fTx.value.trim()){fTx.focus();return;}
+      Object.assign(n,{etapa:fEt.value,padre:fPa.value,tipo:fTi.value,texto:fTx.value.trim(),acr:fAc.value.trim(),origen:fOr.value.trim(),nota:fNo.value.trim(),si:fSi.value.trim(),no:fNO.value.trim(),ruta:fRu.value,control:getCtl()});
+      if(SIN_ACR.has(n.tipo))n.acr="";n.acrForzado=false;n.sinEtapa=false;if(isNew)D.nodos.push(n);fillAcr(false);save();dlg.close();renderAll();});
+  }
+  function move(arr,o,dir){const i=arr.indexOf(o);
+    // mueve entre hermanos (mismo padre y etapa, o misma ruta)
+    let j=i+dir;while(j>=0&&j<arr.length&&!(arr[j].etapa===o.etapa&&arr[j].padre===o.padre))j+=dir;
+    if(j<0||j>=arr.length)return;arr.splice(i,1);arr.splice(j,0,o);}
+  function openPaso(r,p){
+    const isNew=!p;if(!editing()&&!isNew){const b=dlgOpen(p.texto);const c=p.control;
+      readOnly(b,[["Ruta",r.id+" · "+r.nombre],["Acrónimo",p.acr],["Origen",p.origen],["Propiedad intelectual",PI[p.pi].t],["Estado",p.estado==="congelado"?"Congelado":"En desarrollo"],["Experimento",p.experimento],["Nota",p.nota],
+        ["Control",c?CTL[c.tipo].t+": "+(c.que||"—"):"¿?"],["Referencia",c?(c.referencia||"¿?"):""],["Criterio",c?(c.criterio||"¿?"):""],["Plan de reacción",c?(c.reaccion||"¿?"):""],["Resultado",c&&c.resultado]]);
+      btn("Editar","",()=>{setEdit(true);openPaso(r,p);});btn("Cerrar","pri",()=>dlg.close());return;}
+    p=p||{id:uid("p"),texto:"",acr:"",origen:"",nota:"",pi:"sin_definir",estado:"desarrollo",experimento:"",control:null};
+    const b=dlgOpen(isNew?"Nuevo paso en "+r.id:"Editar paso");
+    const fTx=field(b,"Proceso unitario",p.texto,"area");
+    const r2=h("div",{"class":"row2"});b.appendChild(r2);const fAc=field(r2,"Acrónimo (convención α)",p.acr);const fOr=field(r2,"Origen",p.origen);
+    const r3=h("div",{"class":"row2"});b.appendChild(r3);
+    const fPi=field(r3,"Propiedad intelectual",p.pi,"select",Object.keys(PI).map(k=>[k,PI[k].t]));
+    const fEs=field(r3,"Estado",p.estado,"select",[["desarrollo","En desarrollo"],["congelado","Congelado (en el PID; los cambios se registran)"]]);
+    const fEx=field(b,"Experimento (lote dividido: qué parámetro varía y en qué wafers; vacío si no hay)",p.experimento);
+    const fNo=field(b,"Nota",p.nota,"area");
+    b.appendChild(h("p",{"class":"hint",style:"margin:0"},"Regla práctica de PI: si se puede ver en el dispositivo terminado, conviene patentar; si sólo vive en los parámetros del proceso, conviene secreto (en el PID se nombra sin revelarlo)."));
+    const getCtl=controlFields(b,p.control);
+    if(!isNew){btn("Borrar","del",()=>{r.pasos=r.pasos.filter(x=>x!==p);save();dlg.close();renderAll();});
+      btn("↑","",()=>{const i=r.pasos.indexOf(p);if(i>0){r.pasos.splice(i,1);r.pasos.splice(i-1,0,p);save();renderAll();}});
+      btn("↓","",()=>{const i=r.pasos.indexOf(p);if(i<r.pasos.length-1){r.pasos.splice(i,1);r.pasos.splice(i+1,0,p);save();renderAll();}});}
+    btn("Cancelar","",()=>dlg.close());
+    btn("Guardar","pri",()=>{if(!fTx.value.trim()){fTx.focus();return;}
+      if(p.estado==="congelado"&&!isNew){const prev=JSON.stringify([p.texto,p.control]);const nw=JSON.stringify([fTx.value.trim(),getCtl()]);
+        if(prev!==nw)p.nota=(p.nota?p.nota+" · ":"")+"Cambio sobre paso congelado ("+new Date().toISOString().slice(0,10)+"): registrarlo en el control de cambios.";}
+      Object.assign(p,{texto:fTx.value.trim(),acr:fAc.value.trim(),origen:fOr.value.trim(),pi:fPi.value,estado:fEs.value,experimento:fEx.value.trim(),nota:fNo.value.trim()||p.nota,control:getCtl()});
+      p.acrForzado=false;if(isNew)r.pasos.push(p);fillAcr(false);save();dlg.close();renderAll();});
+  }
+  function openRuta(r){const isNew=!r;r=r||{id:"DP-0"+(D.rutas.length+2),nombre:"",acr:"",escala:"laboratorio",tecnologia:"",entrada:"",salida:"",pasos:[]};
+    const b=dlgOpen(isNew?"Nueva ruta de fabricación":"Datos de la ruta "+r.id);
+    const fId=field(b,"Código del diagrama",r.id);const fNm=field(b,"Nombre",r.nombre);
+    const r2=h("div",{"class":"row2"});b.appendChild(r2);const fEs=field(r2,"Escala",r.escala,"select",[["laboratorio","Laboratorio (desarrollo de proceso)"],["produccion","Producción (ruta congelada, en serie)"]]);const fAc=field(r2,"Acrónimo",r.acr);
+    const fTe=field(b,"Tecnología",r.tecnologia);const r3=h("div",{"class":"row2"});b.appendChild(r3);const fIn=field(r3,"Entrada (material de partida)",r.entrada);const fOu=field(r3,"Salida (dispositivo terminado)",r.salida);
+    b.appendChild(h("p",{"class":"hint",style:"margin:0"},"Fabricar es hacer el dispositivo siguiendo la ruta, a cualquier escala. Producir es fabricar en serie con la ruta congelada."));
+    if(!isNew&&editing())btn("Borrar la ruta","del",()=>{D.rutas=D.rutas.filter(x=>x!==r);D.nodos.forEach(n=>{if(n.ruta===r.id)n.ruta="";});save();dlg.close();view="proyecto";renderAll();});
+    if(isNew)btn("Desde la biblioteca…","",()=>openBiblioteca());
+    btn("Cancelar","",()=>dlg.close());
+    if(isNew||editing())btn("Guardar","pri",()=>{const old=r.id;Object.assign(r,{id:fId.value.trim()||r.id,nombre:fNm.value.trim(),escala:fEs.value,acr:fAc.value.trim(),tecnologia:fTe.value.trim(),entrada:fIn.value.trim(),salida:fOu.value.trim()});
+      D.nodos.forEach(n=>{if(n.ruta===old)n.ruta=r.id;});if(isNew){D.rutas.push(r);addEnlace(r);}fillAcr(false);save();dlg.close();view="ruta:"+r.id;renderAll();});}
+  function addEnlace(r){if(D.nodos.some(n=>n.tipo==="enlace"&&n.ruta===r.id))return;
+    const et=D.etapas.find(e=>e.id==="mpl")||D.etapas[Math.min(2,D.etapas.length-1)];
+    D.nodos.push({id:uid("n"),etapa:et?et.id:"",padre:"",tipo:"enlace",texto:"Ruta de fabricación: "+r.nombre,origen:r.origenBib||"",ruta:r.id,acr:""});}
+  function openBiblioteca(){const b=dlgOpen("Biblioteca de rutas típicas");
+    b.appendChild(h("p",{"class":"hint",style:"margin:0"},"Pasos y controles genéricos, tomados de la bibliografía. La referencia de cada control queda vacía (con una pista) para que la complete quien conoce el equipo. Ninguna plantilla trae recetas."));
+    const f=field(b,"Plantilla","csi-albsf-lab","select",Object.keys(BIB).map(k=>[k,BIB[k].nombre+" · "+(BIB[k].escala==="produccion"?"producción":"laboratorio")]));
+    const d=h("p",{style:"margin:0"});b.appendChild(d);const upd=()=>{d.textContent=BIB[f.value].desc;};f.addEventListener("change",upd);upd();
+    btn("Cancelar","",()=>dlg.close());
+    btn("Agregar como ruta nueva","pri",()=>{const t=BIB[f.value];const id="DP-0"+(D.rutas.length+2);
+      const r={id,nombre:t.nombre,acr:"",escala:t.escala,tecnologia:t.tecnologia,entrada:t.entrada,salida:t.salida,origenBib:"Biblioteca",
+        pasos:t.pasos.map(x=>({id:uid("p"),texto:x[0],acr:"",origen:"Biblioteca",nota:"",pi:"sin_definir",estado:"desarrollo",experimento:"",control:{tipo:x[1],que:x[2],referencia:"",criterio:"",reaccion:"",resultado:"",pista:x[3]}}))};
+      D.rutas.push(r);addEnlace(r);delete r.origenBib;fillAcr(false);save();dlg.close();view="ruta:"+id;renderAll();});}
+
+  // ------------------------------------------------------------------ esqueleto desde Concepto (CSV) y A3 (.md)
+  function parseCSV(t){t=t.replace(/^\uFEFF/,"");const first=t.split(/\r?\n/)[0]||"";const sep=(first.split(";").length>first.split(",").length)?";":",";
+    const rows=[];let row=[],cell="",q=false;
+    for(let i=0;i<t.length;i++){const ch=t[i];
+      if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}
+      else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell="";}
+      else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&t[i+1]==="\n")i++;row.push(cell);rows.push(row);row=[];cell="";}
+      else cell+=ch;}
+    if(cell||row.length){row.push(cell);rows.push(row);}return rows.filter(r=>r.join("").trim());}
+  function iniciales(s){const w=strip(s).split(/\s+/).filter(Boolean);if(!w.length)return"";if(w.length===1)return w[0];return w.slice(0,3).map(x=>x[0].toUpperCase()).join("");}
+  function pasosDe(txt){let L=String(txt||"").split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    if(L.length<=1)L=String(txt||"").split(/(?:^|\s)\d{1,2}\s*[.)-]\s+|;/).map(s=>s.trim()).filter(Boolean);
+    return L.map(s=>s.replace(/^[-*•·\d.)\s]+/,"").trim()).filter(s=>s.length>2);}
+  function fromConcepto(text){const rows=parseCSV(text);if(rows.length<2)throw new Error("El CSV no tiene respuestas.");
+    const hd=rows[0].map(norm);const ip=hd.findIndex(x=>x.includes("primeros pasos"));if(ip<0)throw new Error("No encontré la columna «Primeros pasos para ponerla en marcha» (pregunta 16).");
+    const iname=hd.findIndex(x=>/nombre|autor|apellido|quien/.test(x)&&!/proyecto/.test(x));
+    const out=[];rows.slice(1).forEach((r,k)=>{const who=iname>=0&&r[iname]?iniciales(r[iname]):"Persona "+(k+1);
+      pasosDe(r[ip]).forEach(s=>{const c=classify(s);out.push({id:uid("n"),etapa:c.etapa,padre:"",tipo:c.tipo,texto:short(s,110),nota:s.length>110?s:"",origen:who,sinEtapa:c.sinEtapa,
+        control:c.control?{tipo:c.control,que:short(s,110),referencia:"",criterio:"",reaccion:"",resultado:""}:null});});});
+    return out;}
+  function fromA3(text){const L=text.split(/\r?\n/);let box=0;const items={};
+    L.forEach(l=>{const m=l.match(/^##\s*(\d)\s*·/);if(m){box=+m[1];items[box]=[];return;}
+      if(/^---/.test(l)){box=0;return;}
+      if(!box||!l.trim()||/^\*[^*].*\*\s*$/.test(l)||/^#|^\|/.test(l))return;
+      const think=l.match(/^>\s*\*Para pensar:\*\s*(.*)/);if(think){items[box].push({think:true,t:strip(think[1])});return;}
+      if(/^>/.test(l))return;items[box].push({t:strip(l.replace(/^\s*[-*]\s+/,""))});});
+    const out=[];const add=(etapa,tipo,t,extra)=>out.push(Object.assign({id:uid("n"),etapa,padre:"",tipo,texto:short(t,100),nota:t.length>100?t:"",origen:"A3 "+extra.box,control:null},extra.o||{}));
+    const pend=(t,box,etapa)=>{const m=t.match(/\[(?:a definir|a confirmar|a verificar)[:;]?\s*([^\]]*)\]/i);if(m)add(etapa,"decision","¿"+(m[1]||"Se confirma")+"?",{box,o:{si:"",no:""}});};
+    const ET={1:"pln",2:"drq",3:"pln",4:"mpl",5:"pmv",6:"pmv",7:"pln",8:"vld",9:"drq"};
+    Object.keys(items).forEach(k=>{const bx=+k,et=ET[bx];if(!et)return;
+      const its=items[bx].filter(x=>x.t&&!/:\s*$/.test(x.t));
+      if(bx===7){if(its.length)add("pln","proceso","Presupuesto y financiamiento",{box:7,o:{nota:its.map(x=>x.t).join(" · ")}});return;}
+      its.forEach(x=>{
+        if(x.think){const q=x.t.match(/¿[^?]*\?/g);add(et,"decision",q?q[q.length-1]:short(x.t,90),{box:bx,o:{nota:x.t}});return;}
+        if(bx===3){add("pln","decision","¿Los beneficiarios valoran esto: «"+short(x.t,70)+"»?",{box:3,o:{si:"Seguir",no:"Revisar la caja 3 del A3",nota:x.t}});return;}
+        const clean=x.t.replace(/\[[^\]]*\]/g,"").trim();
+        if(clean.replace(/[^A-Za-zÀ-ÿ]/g,"").length<4||/:\s*$/.test(clean)){pend(x.t,bx,et);return;}  // sólo quedó una etiqueta
+        if(bx===8){add("vld","proceso",clean,{box:8,o:{control:{tipo:ctlTipo(norm(clean)),que:short(clean,100),referencia:"",criterio:"",reaccion:"",resultado:""}}});}
+        else add(et,(bx===2||bx===9||bx===1||bx===5||bx===6)?(R_DOC.test(norm(clean))?"documento":"datos"):"proceso",clean,{box:bx});
+        pend(x.t,bx,et);});});
+    return out;}
+  function readFile(inp){return new Promise((res,rej)=>{const f=inp.files&&inp.files[0];if(!f)return res(null);const rd=new FileReader();rd.onload=()=>res(rd.result);rd.onerror=rej;rd.readAsText(f,"utf-8");});}
+  function openEsqueleto(){const b=dlgOpen("Esqueleto desde Concepto y A3");
+    b.appendChild(h("p",{style:"margin:0"},"La herramienta arma un borrador con reglas fijas, sin IA y sin enviar datos afuera: ubica cada caja del A3 en su etapa y cada paso de la pregunta 16 del Concepto según palabras clave, marca los controles, convierte las preguntas abiertas en decisiones y propone acrónimos. Después pregunta lo que no puede decidir."));
+    const l1=h("label",null,"Concepto: respuestas de Google Forms (.csv)");const i1=h("input",{type:"file",accept:".csv"});l1.appendChild(i1);b.appendChild(l1);
+    const l2=h("label",null,"A3 (.md generado con CaPI_GenerarA3.py)");const i2=h("input",{type:"file",accept:".md,.txt"});l2.appendChild(i2);b.appendChild(l2);
+    const fM=field(b,"Qué hacer con el diagrama actual","agregar","select",[["agregar","Agregar al diagrama actual"],["nuevo","Empezar uno nuevo (conserva el control documental y las etapas)"]]);
+    btn("Cancelar","",()=>dlg.close());
+    btn("Generar","pri",async()=>{try{const [c,a]=await Promise.all([readFile(i1),readFile(i2)]);if(!c&&!a){i1.focus();return;}
+        let nuevos=[];if(c)nuevos=nuevos.concat(fromConcepto(c));if(a)nuevos=nuevos.concat(fromA3(a));
+        if(fM.value==="nuevo"){D.nodos=[];D.rutas=[];}
+        ["pln","drq","mpl","vld","pmv"].forEach((id,i)=>{if(!D.etapas.some(e=>e.id===id))D.etapas.splice(i,0,{id,nombre:["Planificación","Determinación de requisitos","Implementación","Validación","PMV"][i]});});
+        D.nodos=D.nodos.concat(nuevos);fillAcr(false);save();renderAll();
+        const sin=nuevos.filter(n=>n.sinEtapa).length,ck=nuevos.filter(n=>n.control).length,dec=nuevos.filter(n=>n.tipo==="decision").length;
+        msg("Esqueleto generado","Se agregaron "+nuevos.length+" elementos: "+ck+" con control, "+dec+" decisiones y "+sin+" sin etapa clara.\nRevisá la lista de preguntas: ahí están las dudas que la herramienta no puede resolver sola, incluidos los pasos que parecen repetidos.");
+      }catch(e){msg("No se pudo generar",e.message);}});}
+
+  // ------------------------------------------------------------------ exportar e importar
+  function slug(){return (D.doc.codigo||"flujo").replace(/[^A-Za-z0-9._-]+/g,"_");}
+  function download(name,text,type){const a=h("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  const csvCell=v=>{v=String(v==null?"":v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  const csv=rows=>"\uFEFF"+rows.map(r=>r.map(csvCell).join(";")).join("\n");
+  const COLS=["id","etapa","padre","tipo","texto","acr","origen","nota","si","no","ruta","ctipo","que","referencia","criterio","reaccion","resultado"];
+  function pickRuta(){if(view.startsWith("ruta:"))return D.rutas.find(r=>"ruta:"+r.id===view);return D.rutas[0];}
+  function exportar(kind){
+    if(kind==="json")return download(slug()+".json",JSON.stringify(D,null,1),"application/json");
+    if(kind==="csv")return download(slug()+"_elementos.csv",csv([COLS].concat(D.nodos.map(n=>{const c=n.control||{};return[n.id,n.etapa,n.padre,n.tipo,n.texto,n.acr,n.origen,n.nota,n.si,n.no,n.ruta,n.control?c.tipo:"",c.que,c.referencia,c.criterio,c.reaccion,c.resultado];}))),"text/csv");
+    if(kind==="dic"){const rows=Array.from($("dic-body").rows).map(tr=>Array.from(tr.cells).map(td=>td.textContent));
+      return download(slug()+"_Diccionario.md","# Diccionario (borrador) — "+(D.doc.titulo||"")+"\n\n*Generado con la herramienta Flujo del proyecto DiDe desde "+(D.doc.codigo||"")+" v"+(D.doc.version||"")+". Revisar en el paso WBS.*\n\n| Acrónimo | Nivel | Padre | Nombre | Tipo | Origen |\n|---|---|---|---|---|---|\n"+rows.map(r=>"| `"+r[0]+"` | "+r.slice(1).join(" | ")+" |").join("\n")+"\n","text/markdown");}
+    if(kind==="wbs"){const rows=Array.from($("dic-body").rows).map(tr=>Array.from(tr.cells).map(td=>td.textContent));
+      return download(slug()+"_WBS.md","# WBS (borrador) — "+(D.doc.titulo||"")+"\n\n*Árbol de acrónimos desde el flujo del proyecto. Las decisiones y revisiones no van al WBS. Falta completar QUÉ y CÓMO de cada globito.*\n\n"+rows.map(r=>"  ".repeat(+r[1])+"- `"+r[0]+"` — "+r[3]).join("\n")+"\n","text/markdown");}
+    const r=pickRuta();if(!r){msg("No hay rutas","Esta exportación sale de una ruta de fabricación. Agregá una con «+ Ruta de fabricación» (en modo edición) o desde la biblioteca.");return;}
+    if(kind==="amfe")return download(r.id+"_AMFE-proceso.csv",csv([["N.º","Paso (proceso unitario)","Acrónimo","Función / requisito del paso","Modo de falla","Efecto","S","Causa","O","Control actual de prevención","Control actual de detección","D","NPR","Acción recomendada","Responsable y fecha"]]
+      .concat(r.pasos.map((p,i)=>{const c=p.control||{};return[i+1,p.texto,p.acr,"","","","","","","",p.control?(CTL[c.tipo].t+": "+(c.que||"")+(c.referencia?" (ref.: "+c.referencia+")":"")):"","","","",""];}))),"text/csv");
+    if(kind==="plan")return download(r.id+"_Plan-de-control.csv",csv([["N.º","Paso","Característica","Tipo de control","Método y referencia","Criterio","Tamaño y frecuencia de muestra","Registro","Plan de reacción","Responsable"]]
+      .concat(r.pasos.map((p,i)=>{const c=p.control||{};return[i+1,p.texto,c.que||"",p.control?CTL[c.tipo].t:"",c.referencia||"",c.criterio||"","","Hoja de ruta del lote",c.reaccion||"",""];}))),"text/csv");
+    if(kind==="hoja")return download(r.id+"_Hoja-de-ruta-lote.csv",csv([["Lote","Wafer / pieza","N.º","Paso","Fecha y hora","Operador","Equipo","Parámetros","Control: "+"qué se midió","Valor medido","¿Cumple?","Desvío u observación","Firma"]]
+      .concat(r.pasos.map((p,i)=>["","",i+1,p.texto,"","","","",(p.control&&p.control.que)||"","","","",""]))),"text/csv");}
+  $("sel-exp").addEventListener("change",function(){const v=this.value;this.value="";if(v)exportar(v);});
+  $("f-imp").addEventListener("change",function(){const file=this.files[0];if(!file)return;const rd=new FileReader();
+    rd.onload=()=>{try{
+      if(/\.csv$/i.test(file.name)){const rows=parseCSV(rd.result);const hd=rows.shift().map(x=>x.trim().toLowerCase());
+        if(hd.some(x=>norm(x).includes("primeros pasos")))throw new Error("Parece un CSV del Concepto: usá «Esqueleto desde Concepto y A3».");
+        D.nodos=rows.map((r,j)=>{const o={};hd.forEach((k,i)=>o[k]=(r[i]||"").trim());
+          const n={id:o.id||"n"+(j+1),etapa:o.etapa,padre:o.padre,tipo:o.tipo,texto:o.texto,acr:o.acr,origen:o.origen,nota:o.nota,si:o.si,no:o.no,ruta:o.ruta,control:null};
+          if(o.ctipo)n.control={tipo:o.ctipo,que:o.que,referencia:o.referencia,criterio:o.criterio,reaccion:o.reaccion,resultado:o.resultado};return n;});}
+      else{const o=JSON.parse(rd.result);if(!o.doc||!o.etapas||!o.nodos)throw new Error('Faltan "doc", "etapas" o "nodos".');D=o;}
+      normalize();save();view="proyecto";renderAll();
+    }catch(e){msg("No se pudo importar","Revisá el formato del archivo: "+e.message);}};
+    rd.readAsText(file,"utf-8");this.value="";});
+
+  // ------------------------------------------------------------------ impresión
+  const PAPEL={A4:[297,210],A3:[420,297]};
+  function applyPaper(){const p=PAPEL[pref.papel]||PAPEL.A4,d=D.doc,s=(SEMA[d.semaforo]||SEMA.rojo);
+    const box="font-family:Consolas,monospace;font-size:8pt;color:#444;";
+    $("papel").textContent="@page{size:"+pref.papel+" landscape;margin:10mm 10mm 10mm 20mm;"+
+      "@top-left{content:"+cssStr((d.codigo||"")+" · Flujo del proyecto DiDe · "+(d.titulo||""))+";"+box+"vertical-align:middle}"+
+      "@top-right{content:"+cssStr("Versión "+(d.version||"")+" · "+(d.fecha||""))+";"+box+"vertical-align:middle}"+
+      "@bottom-left{content:"+cssStr("Elaboró: "+(d.elaboro||"")+" · Semáforo: "+(d.semaforo||"")+" — "+s.d)+";"+box+"vertical-align:middle}"+
+      "@bottom-right{content:\"Página \" counter(page) \" de \" counter(pages);"+box+"vertical-align:middle}}"+
+      "@media print{.sheet{height:"+(p[1]-21)+"mm}}";
+    $("sel-papel").value=pref.papel;}
+  function doPrint(all){printAll=all;document.body.classList.toggle("print-all",all);window.print();}
+  window.addEventListener("afterprint",()=>document.body.classList.remove("print-all"));
+  $("b-print").addEventListener("click",()=>doPrint(true));
+  $("b-print-v").addEventListener("click",()=>doPrint(false));
+  $("sel-papel").addEventListener("change",function(){pref.papel=this.value;savePref();applyPaper();});
+
+  // ------------------------------------------------------------------ edición de campos del documento y botones
+  function bindDocFields(){document.querySelectorAll("[data-f]").forEach(e=>{if(e._b)return;e._b=true;e.contentEditable=editing()?"true":"false";
+    e.addEventListener("input",()=>{D.doc[e.dataset.f]=e.textContent;save();document.querySelectorAll('[data-f="'+e.dataset.f+'"]').forEach(o=>{if(o!==e)o.textContent=e.textContent;});applyPaper();});});}
+  $("sema-sel").addEventListener("change",function(){D.doc.semaforo=this.value;save();renderDoc();});
+  $("b-edit").addEventListener("click",()=>setEdit(!editing()));
+  $("b-add").addEventListener("click",()=>{const r=view.startsWith("ruta:")&&D.rutas.find(x=>"ruta:"+x.id===view);if(r)openPaso(r,null);else openNodo(null);});
+  $("b-ruta").addEventListener("click",()=>openRuta(null));
+  $("b-esq").addEventListener("click",openEsqueleto);
+  $("fl-o").addEventListener("change",function(){filtO=this.value;renderProyecto();D.rutas.forEach(r=>{const s=$("svg-"+r.id);if(s)renderRutaSVG(r,s);});});
+  $("d-x").addEventListener("click",()=>dlg.close());
+  $("b-reset").addEventListener("click",()=>{const b=dlgOpen("Volver a los datos del archivo");
+    b.appendChild(h("p",{style:"margin:0"},"Se pierden los cambios guardados en este navegador. Exportá un JSON antes si los querés conservar."));
+    btn("Cancelar","",()=>dlg.close());btn("Volver a los datos","del",()=>{try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);normalize();dlg.close();view="proyecto";renderAll();});});
+
+  // la dirección puede abrir una vista: …html#ruta:DP-02 o …html#dic; …html#todo prepara la impresión completa (para scripts)
+  if(location.hash==="#todo")document.body.classList.add("print-all");
+  else if(location.hash.length>1)view=decodeURIComponent(location.hash.slice(1));
+  load();renderAll();
+})();
+</script>
+</body>
+</html>
