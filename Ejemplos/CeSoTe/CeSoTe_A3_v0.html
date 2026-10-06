@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A3 — CeSoTe — Equipo CeSoTe (perfiles ficticios E·R·F·Q)</title>
+<style>
+  :root{color-scheme:light;--ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--teal:#1f6b62;--muted:#615d54;--amber:#9a5b00;--amber-bg:#fff6e5;--faint:#b9b4a6;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;}
+  .toolbar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 20px;background:var(--ink);color:#fff;font-size:13px}
+  .toolbar .hint{color:#d9d4c4}
+  .toolbar .grow{flex:1}
+  .toolbar button{font:inherit;font-size:13px;padding:7px 13px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .toolbar button.ghost{background:transparent;color:#fff}
+  .toolbar button:hover{opacity:.85}
+  .page{max-width:1600px;margin:0 auto;padding:22px 20px 40px}
+  .sheet{background:var(--paper);border:1px solid var(--ink);margin:0 0 26px;padding:16px 22px;display:flex;flex-direction:column;min-width:1100px}
+  .run{display:flex;justify-content:space-between;gap:16px;font-family:Consolas,monospace;font-size:11px;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:6px;margin-bottom:14px}
+  .run.foot{border-bottom:0;border-top:1px solid var(--ink);padding:6px 0 0;margin:14px 0 0}
+  .cover-body{flex:1;display:flex;flex-direction:column;gap:16px}
+  .kicker{font-family:Consolas,monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin-bottom:6px}
+  .ttl{font-size:30px;font-weight:700;line-height:1.2;margin:0}
+  .sub{font-size:16px;color:var(--muted);margin-top:6px}
+  .f{display:block;min-height:1.4em;border-bottom:1px dotted var(--faint);font-size:15px;outline:none;padding:1px 2px}
+  .f:focus{background:#fffbe8;border-bottom-color:var(--teal)}
+  .f:empty::before{content:attr(data-ph);color:var(--faint)}
+  table.t{width:100%;border-collapse:collapse;table-layout:fixed}
+  table.t td,table.t th{border:1px solid var(--ink);padding:8px 10px;vertical-align:top;text-align:left}
+  table.t th{font-family:Consolas,monospace;font-size:11px;font-weight:400;color:var(--muted);background:#f7f4ea}
+  .k{display:block;font-family:Consolas,monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  .v{display:block;font-size:15px}
+  .sig{border-bottom:1px solid var(--ink);height:44px;margin-top:10px}
+  .box{border:1px solid var(--ink);padding:8px 10px}
+  .note{font-size:12.5px;color:var(--muted)}
+  .a3{border:2px solid var(--ink);border-radius:5px;overflow:hidden;background:var(--paper);min-width:1000px}
+  .a3-title{font-family:Consolas,monospace;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;background:var(--ink);color:#fff;padding:9px 15px;display:flex;justify-content:space-between;gap:20px}
+  .a3-title .badge{color:#ffd37a;letter-spacing:.08em}
+  .top{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:minmax(270px,auto) minmax(270px,auto)}
+  .bottom{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid var(--ink)}
+  .cell{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:13px 15px;display:flex;flex-direction:column;min-width:0}
+  .top .c-seg{border-right:none}
+  .bottom .cell{min-height:190px;border-bottom:none}
+  .bottom .c-ingr{border-right:none}
+  .c-prob{grid-column:1;grid-row:1/3}
+  .c-sol{grid-column:2;grid-row:1}
+  .c-metr{grid-column:2;grid-row:2}
+  .c-valor{grid-column:3;grid-row:1/3}
+  .c-vent{grid-column:4;grid-row:1}
+  .c-canal{grid-column:4;grid-row:2}
+  .c-seg{grid-column:5;grid-row:1/3}
+  .h{display:flex;align-items:flex-start;gap:7px;margin-bottom:6px}
+  .n{font-family:Consolas,monospace;font-weight:700;font-size:13px;color:var(--teal);line-height:1.3}
+  .name{font-family:Consolas,monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;line-height:1.25}
+  .ic{margin-left:auto;width:20px;height:20px;flex:0 0 auto}
+  .guide{font-size:11.5px;line-height:1.35;color:var(--muted);background:#f7f4ea;border-left:3px solid var(--teal);padding:5px 8px;margin-bottom:9px}
+  .guide .src{display:block;font-family:Consolas,monospace;font-size:10px;margin-top:3px;color:var(--teal)}
+  .guide.wait{border-left-color:var(--amber);background:var(--amber-bg)}
+  .guide.wait .src{color:var(--amber)}
+  .body{flex:1;font-size:14px;line-height:1.45;outline:none;border-radius:3px;padding:2px 3px}
+  .body:focus{background:#fffbe8}
+  .body:empty::before{content:attr(data-ph);color:var(--faint);font-style:italic}
+  .body p{margin:0 0 7px}
+  .body ul{margin:0 0 7px;padding-left:18px}
+  .body li{margin-bottom:4px}
+  .pend{color:var(--amber)}
+  .think{border:1px dashed var(--teal);color:var(--teal);padding:5px 7px;font-style:italic;font-size:13px}
+  @media print{
+    body{background:#fff;font-size:15px}
+    .no-print,.toolbar{display:none!important}
+    .page{max-width:none;padding:0}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .sheet{border:0;margin:0;padding:0;min-width:0;break-after:page}
+    .sheet:last-child{break-after:auto}
+    .cover{page:cover;min-height:402mm}
+    .canvas{page:canvas;min-height:279mm}
+    .canvas .a3{flex:1;display:flex;flex-direction:column;min-width:0}
+    .canvas .top{flex:1;grid-template-rows:1fr 1fr}
+    .canvas .bottom{min-height:60mm}
+    .f:empty::before,.body:empty::before{content:""}
+    .f{border-bottom-color:#999}
+    .cell{break-inside:avoid}
+    .body{font-size:16px}
+    .ttl{font-size:38px}
+  }
+  /* A4-INICIO */
+  @page cover{size:A4 portrait;margin:10mm 10mm 10mm 20mm}
+  @page canvas{size:A4 landscape;margin:10mm 10mm 10mm 20mm}
+  @media print{
+    body{font-size:11px}
+    .run{display:none}
+    .cover{min-height:276mm}
+    .canvas{min-height:0;height:189mm}
+    .canvas .a3{min-height:0}
+    .canvas .top{flex:1 1 0;min-height:0}
+    .canvas .bottom{flex:0 0 auto}
+    .sheet,.a3{min-width:0}  /* en pantalla miden 1100 px; la hoja A4 apaisada tiene ~1010 px útiles */
+    .canvas .top{grid-template-rows:minmax(0,1fr) minmax(0,1fr)}
+    .canvas .bottom{min-height:0}
+    .bottom .cell{min-height:0}
+    .cell{padding:7px 9px}
+    .cell .h{margin-bottom:4px}
+    .ttl{font-size:25px}
+    .sub{font-size:12px}
+    .f,.v{font-size:11px}
+    .note{font-size:9.5px}
+    .k,table.t th{font-size:8px}
+    .a3-title{font-size:9.5px;padding:5px 10px}
+    .n{font-size:10px}
+    .name{font-size:8.5px}
+  }
+  @page{@top-left{content:"CeSoTe-A3 · A3 — CeSoTe · Celdas Solares Terrestres";font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;}@top-right{content:"Versión 0.1 · Emisión 2026-10-05";font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;}@bottom-left{content:"Elaboró: Equipo CeSoTe (perfiles ficticios E·R·F·Q) · Carácter: público · ejercicio CaPI";font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;}@bottom-right{content:"Página " counter(page) " de " counter(pages);font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;}}
+  /* A4-FIN */
+  @media print{.body{font-size:9.0px}}
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <strong>A3 en construcción</strong>
+  <span class="hint">Hoja 1: carátula · Hoja 2: lienzo. Hacé clic en cualquier texto para editarlo; se guarda solo en este navegador.</span>
+  <span class="grow"></span>
+  <button type="button" id="btn-print">Imprimir / Guardar PDF</button>
+  <button type="button" id="btn-save">Descargar mi versión (.html)</button>
+  <button type="button" id="btn-reset" class="ghost">Volver al borrador</button>
+</div>
+
+<main class="page" id="page">
+
+  <section class="sheet cover">
+    <header class="run">
+      <span><b data-mirror="f-codigo">CeSoTe-A3</b> · <span data-mirror="f-titulo">A3 — CeSoTe · Celdas Solares Terrestres</span></span>
+      <span>Versión <span data-mirror="f-version">0.1</span> · Emisión <span data-mirror="f-fecha"></span></span>
+    </header>
+
+    <div class="cover-body">
+      <div>
+        <div class="kicker">DiDe — Paso 2 · Formulario A3</div>
+        <h1 class="ttl f" id="f-titulo" contenteditable="true" data-ph="Título">A3 — CeSoTe · Celdas Solares Terrestres</h1>
+        <div class="sub f" contenteditable="true" data-ph="Subtítulo">Línea piloto de celdas solares de silicio cristalino hechas en el país · Ejercicio CaPI con perfiles ficticios</div>
+      </div>
+
+      <table class="t">
+        <tr>
+          <td style="width:26%"><span class="k">Código</span><span class="f" id="f-codigo" contenteditable="true" data-ph="Código">CeSoTe-A3</span></td>
+          <td style="width:14%"><span class="k">Versión</span><span class="f" id="f-version" contenteditable="true" data-ph="0.1">0.1</span></td>
+          <td style="width:20%"><span class="k">Emisión</span><span class="f" id="f-fecha" contenteditable="true" data-ph="aaaa-mm-dd">2026-10-05</span></td>
+          <td style="width:24%"><span class="k">Estado</span><span class="f" contenteditable="true" data-ph="Estado">Ejercicio · borrador</span></td>
+          <td style="width:16%"><span class="k">Páginas</span><span class="v">2</span></td>
+        </tr>
+      </table>
+
+      <table class="t">
+        <tr>
+          <td style="width:34%">
+            <span class="k">Elaboró</span>
+            <span class="v" data-mirror="f-autor">Equipo CeSoTe (perfiles ficticios E·R·F·Q)</span>
+            <span class="note" data-mirror="f-etapa">CeSoTe (ejercicio CaPI)</span>
+            <span class="k" style="margin-top:6px">Fecha: <span data-mirror="f-fecha"></span></span>
+            <div class="sig"></div><span class="k">Firma</span>
+          </td>
+          <td style="width:33%">
+            <span class="k">Revisó</span>
+            <span class="f" contenteditable="true" data-ph="Nombre y cargo"></span>
+            <span class="k" style="margin-top:6px">Fecha</span>
+            <span class="f" contenteditable="true" data-ph="aaaa-mm-dd"></span>
+            <div class="sig"></div><span class="k">Firma</span>
+          </td>
+          <td style="width:33%">
+            <span class="k">Aprobó</span>
+            <span class="f" contenteditable="true" data-ph="Nombre y cargo"></span>
+            <span class="k" style="margin-top:6px">Fecha</span>
+            <span class="f" contenteditable="true" data-ph="aaaa-mm-dd"></span>
+            <div class="sig"></div><span class="k">Firma</span>
+          </td>
+        </tr>
+      </table>
+
+      <table class="t">
+        <tr>
+          <td style="width:25%"><span class="k">Autor/a</span><span class="f" id="f-autor" contenteditable="true" data-ph="Nombre y apellido">Equipo CeSoTe (perfiles ficticios E·R·F·Q)</span></td>
+          <td style="width:25%"><span class="k">Proyecto</span><span class="f" id="f-etapa" contenteditable="true" data-ph="Proyecto">CeSoTe (ejercicio CaPI)</span></td>
+          <td style="width:25%"><span class="k">Laboratorio / institución</span><span class="f" contenteditable="true" data-ph="Laboratorio e institución">[ficticio]</span></td>
+          <td style="width:25%"><span class="k">Dirección</span><span class="f" contenteditable="true" data-ph="Dirección">—</span></td>
+        </tr>
+        <tr>
+          <td colspan="2"><span class="k">Método</span><span class="f" contenteditable="true" data-ph="Método">DiDe — Paso 2 (A3)</span></td>
+          <td colspan="2"><span class="k">Carácter</span><span class="f" contenteditable="true" data-ph="Carácter">Público — ejercicio CaPI con perfiles ficticios</span></td>
+        </tr>
+      </table>
+
+      <div class="box">
+        <span class="k">Contenido de este documento</span>
+        <div class="f" contenteditable="true" data-ph="Contenido">Hoja 2: lienzo A3 de nueve cajas destilado de las cuatro encuestas de Concepto del equipo CeSoTe. Borrador armado por Claude (IA) a pedido de Cinthya Toro. Las respuestas son simuladas: E = ing. en ecología, R = ing. en energías renovables, F = doctor en física (celdas espaciales), Q = ing. químico.</div>
+        <span class="note" style="display:block;margin-top:6px">Origen: CaPI_Ejercicio-CST_Encuestas-Concepto_v0.md (05/10/2026) y CaPI_Ejercicio-CST_Normas-Fabricacion_v0.md. Las cifras son estimaciones de los perfiles, a verificar.</span>
+      </div>
+
+      <table class="t">
+        <tr><th style="width:12%">Versión</th><th style="width:16%">Fecha</th><th>Descripción del cambio</th><th style="width:22%">Responsable</th></tr>
+        <tr>
+          <td><span class="f" contenteditable="true" data-ph="0.1">0.1</span></td>
+          <td><span class="f" data-mirror="f-fecha" style="border:0"></span></td>
+          <td><span class="f" contenteditable="true" data-ph="Cambio">Borrador inicial desde las cuatro encuestas; caja 9 con las propiedades DiDe y la formación de doctorandos (pedido de la autora).</span></td>
+          <td><span class="f" contenteditable="true" data-ph="Nombre">Equipo CeSoTe (perfiles ficticios E·R·F·Q)</span></td>
+        </tr>
+        <tr>
+          <td><span class="f" contenteditable="true" data-ph=" "></span></td>
+          <td><span class="f" contenteditable="true" data-ph=" "></span></td>
+          <td><span class="f" contenteditable="true" data-ph=" "></span></td>
+          <td><span class="f" contenteditable="true" data-ph=" "></span></td>
+        </tr>
+      </table>
+    </div>
+
+    <footer class="run foot">
+      <span>Elaboró: <span data-mirror="f-autor">Equipo CeSoTe (perfiles ficticios E·R·F·Q)</span> · <span data-mirror="f-fecha"></span></span>
+      <span>Carácter: público · ejercicio CaPI</span>
+      <span>Página 1 de 2</span>
+    </footer>
+  </section>
+
+  <section class="sheet canvas">
+    <header class="run">
+      <span><b data-mirror="f-codigo">CeSoTe-A3</b> · <span data-mirror="f-titulo">A3 — CeSoTe · Celdas Solares Terrestres</span></span>
+      <span>Versión <span data-mirror="f-version">0.1</span> · Emisión <span data-mirror="f-fecha"></span></span>
+    </header>
+
+    <div class="a3">
+      <div class="a3-title"><span data-mirror="f-titulo">A3 — CeSoTe · Celdas Solares Terrestres</span><span class="badge no-print">Ejercicio · borrador</span></div>
+      <div class="top">
+        <div class="cell c-prob">
+          <div class="h"><span class="n">2</span><span class="name">Problemas</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 22 20H2Z"/><rect x="11" y="9" width="2" height="6" fill="#fff"/><rect x="11" y="16.4" width="2" height="2" fill="#fff"/></svg></div>
+          <div class="guide no-print">¿Qué pasa hoy sin esto? Problema principal, secundarios y cómo se resuelve hoy.<span class="src">Se alimenta de: P7 · P11 · P14 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><p><b>Principal:</b> el país importa todas sus celdas. Precio y plazos dependen de la aduana y del tipo de cambio, y no hay datos de rendimiento local ni de huella.</p><p><b>Secundarios:</b></p><ul><li>Lotes que varían sin poder encontrar la causa: insumos sin especificación propia [Q, F].</li><li>Nadie se hace cargo del panel al final de su vida [E].</li><li>No hay una línea donde ensayar cambios de proceso en volumen [F].</li></ul><p><b>Cómo se resuelve hoy:</b> importando módulos, o armándolos en el país con celdas importadas.</p></div>
+        </div>
+        <div class="cell c-sol">
+          <div class="h"><span class="n">4</span><span class="name">Soluciones</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/><rect x="9" y="18" width="6" height="2"/><rect x="10" y="21" width="4" height="1.6"/></svg></div>
+          <div class="guide no-print">Qué hacés concretamente. Componentes, no el detalle de cómo.<span class="src">Se alimenta de: P13 · P16 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><ul><li><b>Línea piloto</b> de celdas de silicio cristalino, de wafer a celda clasificada [Q]. <span class="pend">[arquitectura propuesta: PERC; a confirmar]</span></li><li><b>Especificación de celda y diagrama de flujo de producción</b> con puntos de inspección (PID, como pide la ECSS) [F].</li><li><b>Medición trazable:</b> simulador calibrado con celda de referencia [F].</li><li><b>Gestión ambiental:</b> efluentes, lavado de gases, ciclo de vida y plan de reciclado [E].</li><li><b>Mini módulo en campo</b> (NOA y Patagonia) y certificación IEC 61215/61730 [R].</li></ul></div>
+        </div>
+        <div class="cell c-metr">
+          <div class="h"><span class="n">8</span><span class="name">Métricas clave</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg></div>
+          <div class="guide no-print">Cómo sabés que funcionó. Indicadores medibles.<span class="src">Se alimenta de: P8 · P17 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><ul><li><b>Técnico:</b> eficiencia de celda y dispersión entre lotes, en simulador clase AAA. <span class="pend">[valores a fijar en la especificación]</span></li><li><b>Proceso:</b> rendimiento de línea (celdas buenas / celdas que entran), lote a lote.</li><li><b>Validación:</b> cada método de medición validado contra una referencia trazable.</li><li><b>Campo:</b> rendimiento real frente a la hoja de datos, durante un año.</li><li><b>Ambiente:</b> huella por kWh frente al módulo importado promedio (ISO 14040/44, verificada por un tercero).</li><li><b>Plazos:</b> primera celda medida en 6–9 meses; mini módulo en campo en 12; permiso ambiental en 18.</li></ul></div>
+        </div>
+        <div class="cell c-valor">
+          <div class="h"><span class="n">3</span><span class="name">Propuesta de valor</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="9" width="18" height="12"/><rect x="3" y="6" width="18" height="4"/><rect x="11" y="6" width="2" height="15" fill="#fff"/><path d="M12 6C11 3 7 3 7 6Z"/><path d="M12 6C13 3 17 3 17 6Z"/></svg></div>
+          <div class="guide no-print">UNA sola frase: qué prometés y por qué elegirlo.<span class="src">Se alimenta de: P3 · P12 (los cuatro perfiles)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><p style="font-size:1.2em;line-height:1.4">Celdas solares hechas en el país, con cada lote medido con trazabilidad y su huella declarada, entregadas cerca de quien las instala.</p></div>
+        </div>
+        <div class="cell c-vent">
+          <div class="h"><span class="n">9</span><span class="name">Ventaja diferencial</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10v4a5 5 0 0 1-10 0z"/><path d="M5 4H3v2a3 3 0 0 0 3 3V7H5z"/><path d="M19 4h2v2a3 3 0 0 1-3 3V7h-1z"/><rect x="10.5" y="12" width="3" height="4"/><rect x="7" y="18" width="10" height="2"/></svg></div>
+          <div class="guide no-print">Qué no pueden copiarte fácil. No es lo mismo que la caja 3.<span class="src">Se alimenta de: P12 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><ul><li><b>Trazabilidad lote a lote</b> con medición calibrada.</li><li><b>Rigor de calificación espacial</b> aplicado a celdas terrestres.</li><li><b>Proceso propio documentado</b> (PID) y control de insumos con especificación propia.</li><li><b>Ciclo de vida declarado</b> y plan de recupero.</li><li><b>Cercanía:</b> entrega, garantía y soporte en el país.</li><li><b>Por cómo se documenta, la línea es transferible, certificable, modular y extensible.</b></li><li><b>Forma doctorandos</b> en fabricación en sala limpia y en procesos micro y nanotecnológicos.</li></ul><p class="think no-print">Ninguno de los cuatro compite en costo: las fábricas de escala de gigawatts producen mucho más barato. ¿Alcanzan la trazabilidad y la cercanía para que un armador pague más? Lo tiene que confirmar el estudio de mercado [R].</p><p class="think no-print">¿Qué es protegible? Las recetas de proceso (ventanas de difusión, perfil de cocción) parecen candidatas a secreto industrial más que a patente.</p></div>
+        </div>
+        <div class="cell c-canal">
+          <div class="h"><span class="n">5</span><span class="name">Canales</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M3 20 21 12 3 4 3 10 14 12 3 14z"/></svg></div>
+          <div class="guide no-print">Cómo le llega a quien lo necesita: vía institucional, publicación, formación, réplica.<span class="src">Se alimenta de: P21 · P23 · P28 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><ul><li><b>Industrial:</b> alianza con un armador local de módulos.</li><li><b>Directo:</b> cooperativas eléctricas e instaladores.</li><li><b>Servicio:</b> medición y calificación de celdas para laboratorios.</li><li><b>Formación:</b> técnicos de sala limpia, con universidades.</li><li><b>Réplica:</b> el PID permite copiar la línea en una planta mayor.</li></ul></div>
+        </div>
+        <div class="cell c-seg">
+          <div class="h"><span class="n">1</span><span class="name">Beneficiarios</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M2.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5z"/><path d="M14 19c0-2.3 1.8-4.1 4-4.1s4 1.8 4 4.1z" opacity=".55"/></svg></div>
+          <div class="guide no-print">¿A quién le sirve? Un principal (el que más lo necesita) y secundarios, concretos.<span class="src">Se alimenta de: P5 · P15 · P21 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><p><b>Principal:</b> armadores locales de módulos que hoy importan todas las celdas.</p><p><b>Secundarios:</b> instaladores y cooperativas eléctricas; empresas que deben informar su huella; laboratorios y sector espacial que necesitan celdas caracterizadas; técnicos y proveedores locales de insumos.</p></div>
+        </div>
+      </div>
+      <div class="bottom">
+        <div class="cell c-cost">
+          <div class="h"><span class="n">7</span><span class="name">Estructura de costes</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M11 2 21 2 21 12 11 22 1 12z"/><circle cx="16.3" cy="6.7" r="1.7" fill="#fff"/></svg></div>
+          <div class="guide no-print">Qué hay que invertir: insumos, equipos que ya hay, horas. Con números.<span class="src">Se alimenta de: P18 · P19 (E, F, Q, R)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><ul><li><b>PMV:</b> USD 0,6–1,2 M con equipos usados (bancos húmedos, difusión, PECVD, serigrafía, cocción, I-V), más unos USD 150 mil para efluentes y gases. <span class="pend">[a verificar; las estimaciones de E, F y Q se solapan]</span></li><li><b>Línea piloto (~10 MW/año):</b> USD 10–20 M, más 10–15 % para gestión ambiental y reciclado. <span class="pend">[a verificar]</span></li><li><b>Costos ocultos:</b> permiso ambiental (lo que más demora), calibración trazable, ensayos de calificación y certificación.</li></ul></div>
+        </div>
+        <div class="cell c-ingr">
+          <div class="h"><span class="n">6</span><span class="name">Valor capturado</span>
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><text x="12" y="16.6" font-size="13" text-anchor="middle" fill="#fff" font-family="serif" font-weight="bold">$</text></svg></div>
+          <div class="guide no-print">Qué obtenés a cambio: dinero, publicaciones, capacidad instalada, PI, conocimiento.<span class="src">Se alimenta de: P6 · P10 · P23 (E, R, F, Q)</span></div>
+          <div class="body" contenteditable="true" data-ph="Escribí acá…"><ul><li><b>Monetario:</b> venta de celdas; servicios de medición, de proceso a terceros, de ciclo de vida y de reciclado.</li><li><b>Estratégico:</b> proceso propio documentado y saber de sala limpia que no se va con las personas.</li><li><b>Institucional:</b> banco de pruebas para TOPCon, heterojuntura y tándem.</li><li><b>PI:</b> <span class="pend">[a definir: qué parte del proceso es protegible]</span></li></ul></div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="run foot">
+      <span>Elaboró: <span data-mirror="f-autor">Equipo CeSoTe (perfiles ficticios E·R·F·Q)</span> · <span data-mirror="f-fecha"></span></span>
+      <span>Carácter: público · ejercicio CaPI</span>
+      <span>Página 2 de 2</span>
+    </footer>
+  </section>
+
+</main>
+
+<script>
+(function(){
+  var KEY='a3-capi-v0.2';
+  var page=document.getElementById('page');
+  function g(id){var x=document.getElementById(id);return x?x.textContent.trim():'';}
+  function sync(){
+    var els=document.querySelectorAll('[data-mirror]');
+    for(var i=0;i<els.length;i++){
+      var s=document.getElementById(els[i].getAttribute('data-mirror'));
+      if(s){els[i].textContent=s.textContent.trim();}
+    }
+  }
+  function today(){
+    var d=new Date(),p=function(n){return (n<10?'0':'')+n;};
+    return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+  }
+
+  var restored=false;
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(raw){
+      var s=JSON.parse(raw);
+      if(s && s.t>(Number(page.getAttribute('data-t'))||0)){
+        page.innerHTML=s.html;
+        page.setAttribute('data-t',s.t);
+        restored=true;
+      }
+    }
+  }catch(e){}
+  if(!restored){
+    var fe=document.getElementById('f-fecha');
+    if(fe && !fe.textContent.trim()){fe.textContent=today();}
+  }
+  sync();
+
+  function save(){
+    var t=Date.now();
+    try{localStorage.setItem(KEY,JSON.stringify({t:t,html:page.innerHTML}));}catch(e){}
+    page.setAttribute('data-t',t);
+  }
+  function setTitle(){
+    sync();
+    document.title='A3 — '+g('f-etapa')+' — '+g('f-autor')+' — '+g('f-fecha');
+  }
+
+  var timer;
+  document.addEventListener('input',function(e){
+    var el=e.target;
+    if(el.classList && el.classList.contains('body') && !el.textContent.trim()){el.innerHTML='';}
+    sync();
+    clearTimeout(timer);
+    timer=setTimeout(save,400);
+  });
+  document.addEventListener('paste',function(e){
+    if(!e.target.isContentEditable){return;}
+    e.preventDefault();
+    var tx=(e.clipboardData||window.clipboardData).getData('text/plain');
+    document.execCommand('insertText',false,tx);
+  });
+  window.addEventListener('beforeprint',setTitle);
+
+  document.getElementById('btn-print').addEventListener('click',function(){setTitle();window.print();});
+  document.getElementById('btn-save').addEventListener('click',function(){
+    save();
+    var slug=(g('f-autor')+'_'+g('f-etapa')).normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'');
+    var html='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+    a.download='A3_'+slug+'_'+today()+'.html';
+    document.body.appendChild(a);a.click();a.remove();
+  });
+  document.getElementById('btn-reset').addEventListener('click',function(){
+    if(confirm('Se pierden los cambios de esta computadora y vuelve el borrador original. ¿Seguro?')){
+      try{localStorage.removeItem(KEY);}catch(e){}
+      location.reload();
+    }
+  });
+})();
+</script>
+</body>
+</html>
