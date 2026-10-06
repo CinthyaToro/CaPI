@@ -55,10 +55,11 @@
   .st span{color:var(--muted);font-size:15px}
   .go{font-size:14px;font-weight:500;text-decoration:none;border:1.5px solid var(--accent);border-radius:4px;padding:4px 12px;white-space:nowrap}
   .go:hover{background:var(--accentbg)}
+  .gos{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
   .soon{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap}
   @media (max-width:560px){
     ol.route li{grid-template-columns:40px minmax(0,1fr)}
-    .go,.soon{grid-column:2;justify-self:start}
+    .go,.soon,.gos{grid-column:2;justify-self:start}
   }
 
   .example{background:var(--warmbg);border-radius:6px;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
@@ -112,8 +113,8 @@
     <h2 id="t-ruta">La ruta DiDe</h2>
     <p class="sub">Ocho pasos, en este orden. Cada uno responde una sola pregunta. Las herramientas son páginas que se abren en el navegador: se editan, se guardan solas en tu computadora y se imprimen en A4.</p>
     <ol class="route">
-      <li><span class="num">1</span><div class="st"><b>Concepto</b><span>¿Qué es la idea y por qué importa?</span></div><a class="go" href="Plantillas/CaPI-Universal_01-Encuesta-Concepto.html">Plantilla</a></li>
-      <li><span class="num">2</span><div class="st"><b>A3</b><span>¿Se entiende el proyecto entero en una sola hoja?</span></div><a class="go" href="Plantillas/CaPI-Universal_02-Plantilla-A3.html">Plantilla</a></li>
+      <li><span class="num">1</span><div class="st"><b>Concepto</b><span>¿Qué es la idea y por qué importa?</span></div><span class="gos"><a class="go" href="https://github.com/CinthyaToro/CaPI/blob/main/Herramientas/CaPI_CrearGoogleForm_Concepto.gs">Formulario de Google</a><a class="go" href="Plantillas/CaPI-Universal_01-Encuesta-Concepto.html">Plantilla</a></span></li>
+      <li><span class="num">2</span><div class="st"><b>A3</b><span>¿Se entiende el proyecto entero en una sola hoja?</span></div><span class="gos"><a class="go" href="Herramientas/DiDe_A3.html">Herramienta</a><a class="go" href="Plantillas/CaPI-Universal_02-Plantilla-A3.html">Guía</a></span></li>
       <li><span class="num">3</span><div class="st"><b>Flujo del proyecto</b><span>¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación?</span></div><a class="go" href="Herramientas/DiDe_FlujoProyecto.html">Herramienta</a></li>
       <li><span class="num">4</span><div class="st"><b>Ishikawa 6M</b><span>¿Qué hay que controlar para que el resultado se repita?</span></div><a class="go" href="Herramientas/DiDe_Ishikawa.html">Herramienta</a></li>
       <li><span class="num">5</span><div class="st"><b>AMFE de proceso y plan de control</b><span>¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla?</span></div><a class="go" href="Herramientas/DiDe_AMFE.html">Herramienta</a></li>

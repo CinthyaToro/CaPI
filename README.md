@@ -18,8 +18,8 @@ desde el primer lote como si fuéramos a calificar. Ver
 
 | # | Paso | Pregunta que responde | Material |
 |---|---|---|---|
-| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
-| 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Plantilla](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
+| 1 | Concepto | ¿Qué es la idea y por qué importa? | [Formulario de Google](Herramientas/CaPI_CrearGoogleForm_Concepto.gs) · [Plantilla](Plantillas/CaPI-Universal_01-Encuesta-Concepto.md) |
+| 2 | A3 | ¿Se entiende el proyecto entero en una sola hoja? | [Herramienta](Herramientas/DiDe_A3.html) · [Guía](Plantillas/CaPI-Universal_02-Plantilla-A3.md) |
 | 3 | Flujo del proyecto | ¿En qué orden se hace cada parte? Si el proyecto fabrica algo, ¿cuál es su ruta de fabricación? | [Herramienta](Herramientas/DiDe_FlujoProyecto.html) |
 | 4 | Ishikawa 6M | ¿Qué hay que controlar para que el resultado se repita? | [Herramienta](Herramientas/DiDe_Ishikawa.html) |
 | 5 | AMFE de proceso y plan de control | ¿Qué puede fallar en cada paso, qué tan grave es y cómo se controla? | [Herramienta](Herramientas/DiDe_AMFE.html) |
@@ -42,8 +42,11 @@ pueda copiar la respuesta.
 
 ## Cómo usar las plantillas y las herramientas
 
-1. Empezá por la encuesta de Concepto. Respondé cada pregunta mirando el ejemplo.
-2. Destilá las respuestas en el A3. Mirá el A3 de SincLE para ver cómo queda.
+1. Empezá por la encuesta de Concepto. Podés responderla en Markdown o crearla en Google Forms con el script
+   `Herramientas/CaPI_CrearGoogleForm_Concepto.gs`: arma en tu cuenta los dos formularios (Etapa I: La Idea;
+   Etapa II: El Proyecto) y las respuestas quedan en tu cuenta. Respondé cada pregunta mirando el ejemplo.
+2. Destilá las respuestas en la herramienta A3: trae el A3 de SincLE de ejemplo y el botón «Empezar uno en blanco»
+   lo deja listo para tu proyecto.
 3. Abrí la herramienta de flujo del proyecto. Con "Esqueleto desde Concepto y A3" arma un primer borrador por reglas,
    sin IA y sin enviar datos afuera; después pregunta lo que no puede decidir.
 4. Seguí con el Ishikawa, el AMFE, la WBS y el Diccionario. Cada herramienta importa lo que exportó la anterior.
