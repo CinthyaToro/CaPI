@@ -1,4 +1,17 @@
 <!DOCTYPE html>
+<!--
+  A3 DiDe — generado con CaPI/Herramientas/CaPI_GenerarA3.py · Cinthya Toro · CaPI / DiDe
+  Paso 2 de la ruta DiDe: Concepto → A3 → Flujo del proyecto → Ishikawa → AMFE y plan de control → WBS → Diccionario → BIMi
+  Exporta (06/10/2026):
+    - .md con el formato de los A3 generados (lo lee «Esqueleto desde Concepto y A3» de la herramienta Flujo);
+    - .json, que vuelve a abrir la herramienta A3 y lee BIMi.
+  FORMATO JSON
+  { "herramienta": "DiDe A3", "version_formato": 1,
+    "doc":   { codigo, version, fecha, estado, semaforo (rojo|amarillo|verde, deducido del Carácter), titulo, subtitulo,
+               elaboro, reviso, fecha_reviso, aprobo, fecha_aprobo, autores, proyecto_k, proyecto, institucion,
+               direccion, metodo, caracter, contenido, origen, historial: [ { version, fecha, cambio, responsable } ] },
+    "cajas": { "1".."9": { nombre, fuente, md, html } } }
+-->
 <html lang="es-AR">
 <head>
 <meta charset="UTF-8">
@@ -120,6 +133,8 @@
   <strong>A3 en construcción</strong>
   <span class="hint">Hoja 1: carátula · Hoja 2: lienzo. Hacé clic en cualquier texto para editarlo; se guarda solo en este navegador.</span>
   <span class="grow"></span>
+  <button type="button" id="btn-md" title="Para la herramienta Flujo del proyecto">Exportar .md</button>
+  <button type="button" id="btn-json" title="Para volver a abrirlo acá o para BIMi">Exportar .json</button>
   <button type="button" id="btn-print">Imprimir / Guardar PDF</button>
   <button type="button" id="btn-save">Descargar mi versión (.html)</button>
   <button type="button" id="btn-reset" class="ghost">Volver al borrador</button>
@@ -386,6 +401,58 @@
       '@bottom-left{content:'+q('Elaboró: '+t('#f-autor')+' · Carácter: '+t('[data-ph="Carácter"]'))+';'+box+'}}';
   }
   paginar();window.addEventListener('beforeprint',paginar);document.addEventListener('input',paginar);
+})();
+
+(function(){
+  var BOX={1:['c-seg','Beneficiarios'],2:['c-prob','Problemas'],3:['c-valor','Propuesta de valor'],4:['c-sol','Soluciones'],
+    5:['c-canal','Canales'],6:['c-ingr','Valor capturado'],7:['c-cost','Estructura de costes'],8:['c-metr','Métricas clave'],9:['c-vent','Ventaja diferencial']};
+  function tx(el){return el?el.textContent.replace(/\s+/g,' ').trim():'';}
+  function q(sel){return tx(document.querySelector(sel));}
+  function firma(i){var td=document.querySelectorAll('.cover table.t')[1];td=td?td.querySelectorAll('td')[i]:null;
+    var f=td?td.querySelectorAll('.f'):[];return {nombre:tx(f[0]),fecha:tx(f[1])};}
+  function semaforo(c){c=c.toLowerCase();if(/confiden|reservad|rojo/.test(c))return 'rojo';if(/grupo|intern|amarill/.test(c))return 'amarillo';
+    if(/p[uú]blic|verde/.test(c))return 'verde';return '';}
+  function inl(n){var s='';n.childNodes.forEach(function(c){
+    if(c.nodeType===3){s+=c.textContent;return;}if(c.nodeType!==1)return;var t=c.tagName;
+    if(t==='BR'){s+='\n';return;}
+    if(t==='B'||t==='STRONG'){var m=inl(c).match(/^(\s*)([\s\S]*?)(\s*)$/);s+=m[1]+(m[2]?'**'+m[2]+'**':'')+m[3];return;}
+    if(c.classList.contains('pend')){s+='`'+c.textContent+'`';return;}s+=inl(c);});
+    return s.replace(/[ \t]+/g,' ').replace(/ *\n */g,'\n');}
+  function cajaMd(b){var out=[],par=[];function flush(){var t=par.join('').trim();if(t)out.push(t);par=[];}
+    b.childNodes.forEach(function(c){
+      if(c.nodeType===3){par.push(c.textContent);return;}if(c.nodeType!==1)return;var t=c.tagName;
+      if(t==='UL'||t==='OL'){flush();var li=Array.prototype.map.call(c.querySelectorAll('li'),function(l){return '- '+inl(l).replace(/\n/g,' ').trim();});if(li.length)out.push(li.join('\n'));return;}
+      if(t==='P'||t==='DIV'){flush();var s=inl(c).trim();if(!s)return;out.push(c.classList.contains('think')?'> *Para pensar:* '+s.replace(/\n/g,' '):s);return;}
+      par.push(inl({childNodes:[c]}));});
+    flush();return out.join('\n\n');}
+  function datos(){
+    var rv=firma(1),ap=firma(2),pj=document.getElementById('f-etapa'),k=pj?tx(pj.parentNode.querySelector('.k')):'Proyecto';
+    var hist=Array.prototype.slice.call(document.querySelectorAll('.cover table.t')).pop();
+    hist=Array.prototype.slice.call(hist.querySelectorAll('tr')).slice(1).map(function(tr){var c=tr.querySelectorAll('.f');
+      return {version:tx(c[0]),fecha:tx(c[1]),cambio:tx(c[2]),responsable:tx(c[3])};}).filter(function(h){return h.version||h.cambio;});
+    var o={herramienta:'DiDe A3',version_formato:1,
+      doc:{codigo:q('#f-codigo'),version:q('#f-version'),fecha:q('#f-fecha'),estado:q('[data-ph="Estado"]'),
+        semaforo:semaforo(q('[data-ph="Carácter"]')),titulo:q('#f-titulo'),subtitulo:q('[data-ph="Subtítulo"]'),
+        elaboro:q('#f-autor'),reviso:rv.nombre,fecha_reviso:rv.fecha,aprobo:ap.nombre,fecha_aprobo:ap.fecha,autores:q('#f-autor'),
+        proyecto_k:k||'Proyecto',proyecto:q('#f-etapa'),institucion:q('[data-ph="Laboratorio e institución"]'),
+        direccion:q('[data-ph="Dirección"]'),metodo:q('[data-ph="Método"]'),caracter:q('[data-ph="Carácter"]'),
+        contenido:q('[data-ph="Contenido"]'),origen:tx(document.querySelector('.cover .box .note')),historial:hist},cajas:{}};
+    Object.keys(BOX).forEach(function(n){var c=document.querySelector('.cell.'+BOX[n][0]);if(!c)return;var b=c.querySelector('.body');
+      o.cajas[n]={nombre:BOX[n][1],fuente:tx(c.querySelector('.guide .src')).replace(/^Se alimenta de:\s*/,''),md:cajaMd(b),html:b.innerHTML};});
+    return o;}
+  function md(o){var d=o.doc,p=function(s){return String(s||'').replace(/\|/g,'\\|');};
+    var L=['# '+d.titulo,'','| Código | Versión | Emisión | Estado | Elaboró | Revisó | Aprobó |','|---|---|---|---|---|---|---|',
+      '| '+[d.codigo,d.version,d.fecha,d.estado,d.elaboro,d.reviso||'—',d.aprobo||'—'].map(p).join(' | ')+' |','',
+      '**'+d.proyecto_k+':** '+d.proyecto+' · **Institución:** '+d.institucion+' · **Carácter:** '+d.caracter,'',
+      '> '+d.contenido,'>','> '+d.origen,''];
+    for(var n=1;n<=9;n++){var c=o.cajas[n];if(!c)continue;L.push('## '+n+' · '+c.nombre,'*Se alimenta de: '+c.fuente+'*','',c.md,'');}
+    L.push('---','*'+d.codigo+' v'+d.version+' · DiDe — Paso 2 (A3)*','');return L.join('\n');}
+  function bajar(nombre,texto,tipo){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([texto],{type:tipo}));
+    a.download=nombre;document.body.appendChild(a);a.click();a.remove();}
+  function slug(o){return (o.doc.codigo||'A3').replace(/[^A-Za-z0-9._-]+/g,'_')+'_v'+(o.doc.version||'0').replace(/[^0-9.]+/g,'');}
+  document.getElementById('btn-md').addEventListener('click',function(){var o=datos();bajar(slug(o)+'.md',md(o),'text/markdown');});
+  document.getElementById('btn-json').addEventListener('click',function(){var o=datos();bajar(slug(o)+'.json',JSON.stringify(o,null,1),'application/json');});
+  window.DiDeA3={datos:datos,md:md};
 })();
 /* EXTRA-FIN */
 </script>

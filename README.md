@@ -45,7 +45,8 @@ pueda copiar la respuesta.
 1. Empezá por la encuesta de Concepto, de una de tres formas: en la herramienta Concepto (en el navegador; descarga
    CSV y Word), con tu copia de los formularios de Google (para que respondan tus clientes o tu equipo), o generándolos
    con el script. Las tres terminan en el mismo CSV. Respondé cada pregunta mirando el ejemplo.
-2. En la herramienta A3, «Importar Concepto» prellena las nueve cajas con ese CSV; después se destila en reunión.
+2. En la herramienta A3, «Importar» prellena las nueve cajas con ese CSV; después se destila en reunión. Al terminar,
+   «Exportar .md» lo deja listo para el paso siguiente («Exportar .json» sirve para volver a abrirlo).
 3. Abrí la herramienta de flujo del proyecto. Con "Esqueleto desde Concepto y A3" arma un primer borrador por reglas,
    sin IA y sin enviar datos afuera; después pregunta lo que no puede decidir.
 4. Seguí con el Ishikawa, el AMFE, la WBS y el Diccionario. Cada herramienta importa lo que exportó la anterior.

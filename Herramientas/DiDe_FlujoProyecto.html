@@ -20,7 +20,7 @@
 
   Para otro proyecto: copiá este archivo y reemplazá el bloque <script id="datos" type="application/json">,
   o usá "Importar" (.json con este formato, o .csv de elementos), o "Esqueleto desde Concepto y A3"
-  (CSV de respuestas de Google Forms + A3 en .md generado por CaPI_GenerarA3.py).
+  (CSV de respuestas de Google Forms + A3 en .md: «Exportar .md» de la herramienta A3, o CaPI_GenerarA3.py).
 
   FORMATO JSON
   { "doc":    { codigo, version, fecha, estado, semaforo (rojo|amarillo|verde), titulo, objetivo, acronimo,
@@ -844,7 +844,7 @@
   function openEsqueleto(){const b=dlgOpen("Esqueleto desde Concepto y A3");
     b.appendChild(h("p",{style:"margin:0"},"La herramienta arma un borrador con reglas fijas, sin IA y sin enviar datos afuera: ubica cada caja del A3 en su etapa y cada paso de la pregunta 16 del Concepto según palabras clave, marca los controles, convierte las preguntas abiertas en decisiones y propone acrónimos. Después pregunta lo que no puede decidir."));
     const l1=h("label",null,"Concepto: respuestas de Google Forms (.csv)");const i1=h("input",{type:"file",accept:".csv"});l1.appendChild(i1);b.appendChild(l1);
-    const l2=h("label",null,"A3 (.md generado con CaPI_GenerarA3.py)");const i2=h("input",{type:"file",accept:".md,.txt"});l2.appendChild(i2);b.appendChild(l2);
+    const l2=h("label",null,"A3 (.md: «Exportar .md» de la herramienta A3)");const i2=h("input",{type:"file",accept:".md,.txt"});l2.appendChild(i2);b.appendChild(l2);
     const fM=field(b,"Qué hacer con el diagrama actual","agregar","select",[["agregar","Agregar al diagrama actual"],["nuevo","Empezar uno nuevo (conserva el control documental y las etapas)"]]);
     btn("Cancelar","",()=>dlg.close());
     btn("Generar","pri",async()=>{try{const [c,a]=await Promise.all([readFile(i1),readFile(i2)]);if(!c&&!a){i1.focus();return;}
