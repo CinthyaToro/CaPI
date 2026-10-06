@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ishikawa DiDe</title>
+<!--
+  HERRAMIENTA ISHIKAWA DiDe — v0.1 (03/10/2026) — Cinthya Toro · CaPI / DiDe
+  Un solo archivo, sin dependencias. Para usarla con otro proyecto:
+    1. Copiá este archivo y reemplazá el bloque <script id="datos" type="application/json"> por tus datos, o
+    2. abrilo y usá "Importar" con un .json (mismo formato) o un .csv (columnas abajo).
+
+  FORMATO JSON
+  {
+    "doc":   { "codigo","version","fecha","estado","semaforo" ("rojo"|"amarillo"|"verde"),
+               "titulo","pregunta","efecto","objetivo","elaboro","reviso","aprobo","autores" },
+    "causas":[ { "id","m" (Método|Máquina|Materiales|Medición|Mano de obra|Medio ambiente),
+                 "texto","autor","estado" (controlada|variable|no_dominada|sin_evaluar),
+                 "nota","medicion" } ]
+  }
+  CSV: id;m;texto;autor;estado;nota;medicion   (separador ; — una causa por fila)
+-->
+<style>
+  /* Espina de pescado alimentada por datos: el color de cada nodo es su estado; la síntesis se calcula sola. */
+  :root{color-scheme:light;
+    --ink:#1b1a16;--paper:#fff;--bg:#f3efe4;--muted:#615d54;--line:#cfc9b8;--teal:#1f6b62;
+    --ok:#2e7d32;--var:#b58500;--nd:#b3261e;--se:#8a8578;--hl:#fffbe8;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;--serif:Georgia,"Times New Roman",serif;--mono:Consolas,ui-monospace,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--serif)}
+  button,select,input,textarea{font:inherit}
+  .bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 18px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:13px}
+  .bar .grow{flex:1}
+  .bar button,.bar label.btn{font-size:13px;padding:6px 11px;border-radius:4px;border:1px solid #fff;background:#fff;color:var(--ink);cursor:pointer}
+  .bar button.ghost{background:transparent;color:#fff}
+  .bar button[aria-pressed="true"]{background:#ffd37a;border-color:#ffd37a}
+  .bar input[type=file]{display:none}
+  .page{max-width:1500px;margin:0 auto;padding:18px;display:flex;flex-direction:column;gap:18px}
+  .canvas{order:0}.cover{order:1}  /* en pantalla, el diagrama primero; al imprimir, la portada primero */
+  .sheet{background:var(--paper);border:1px solid var(--ink);padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+  .run{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:11px;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:5px}
+  .run.foot{border-bottom:0;border-top:1px solid var(--ink);padding:5px 0 0}
+  .canvas-t{font-size:18px;line-height:1.25;margin:0}
+  .head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+  .kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin:0 0 3px}
+  h1{font-size:24px;line-height:1.2;margin:0}
+  .sub{color:var(--muted);font-size:14px;margin:3px 0 0}
+  [data-f]{outline:none;border-radius:3px}
+  body.edit [data-f]{background:var(--hl);border-bottom:1px dotted var(--teal)}
+  .sema{border:2px solid var(--se);border-radius:6px;padding:7px 11px;font-size:13px;min-width:230px;font-family:var(--sans)}
+  .sema b{text-transform:capitalize}
+  .ctrl{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--ink);font-size:13px}
+  .ctrl div{padding:5px 8px;border-right:1px solid var(--ink);min-width:0}.ctrl div:last-child{border-right:0}
+  .k{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+  .filters{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-family:var(--sans);font-size:13px}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--paper);cursor:pointer}
+  .chip[aria-pressed="false"]{opacity:.4}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto}
+  .d-controlada{background:var(--ok)}.d-variable{background:var(--var)}.d-no_dominada{background:var(--nd)}.d-sin_evaluar{background:#fff;border:2px solid var(--se)}
+  .filters select{border:1px solid var(--line);border-radius:4px;padding:3px 6px;background:var(--paper)}
+
+  .diagram{position:relative;border:1px solid var(--line);border-radius:5px;overflow-x:auto}
+  svg{display:block;width:100%;min-width:1050px;height:auto}
+  svg text{font-family:var(--sans)}
+  .bone{stroke:var(--muted);stroke-width:2}
+  .spine{stroke:var(--ink);stroke-width:4}
+  .cat{font-weight:700;fill:var(--teal);text-anchor:middle;letter-spacing:.04em}
+  .lbl{fill:var(--ink);text-anchor:end}
+  .bar select{font-size:13px;padding:5px 6px;border-radius:4px;border:1px solid #fff}
+  .node{cursor:pointer}
+  /* El borde de cada círculo lo fija su atributo stroke (blanco, o gris si está sin evaluar): no se pisa acá. */
+  .node:hover text,.node:focus text{text-decoration:underline}
+  .node:focus{outline:none}
+  .node:focus circle{stroke:var(--ink);stroke-width:3}
+  .node.dim{opacity:.15}
+  .node.sel circle{stroke:var(--ink);stroke-width:3.5}
+  .headbox{fill:#fdf1f0;stroke:var(--nd);stroke-width:2.5}
+  .headtxt{font-size:15px;font-weight:700;fill:var(--ink)}
+  .tip{position:absolute;z-index:5;pointer-events:none;max-width:300px;background:var(--ink);color:#fff;font-family:var(--sans);font-size:12.5px;line-height:1.4;padding:7px 9px;border-radius:5px;display:none}
+
+  .below{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:14px}
+  .box{border:1px solid var(--ink);border-radius:5px;padding:10px 13px;font-size:14px;line-height:1.45;min-width:0}
+  .box h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px;color:var(--teal)}
+  .box p{margin:0 0 6px}
+  .bars{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0 8px;background:var(--line)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;vertical-align:top;padding:5px 7px;border-bottom:1px solid var(--line)}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  tr.dim{display:none}
+  td .dot{margin-right:5px;vertical-align:-1px}
+  tbody tr{cursor:pointer}tbody tr:hover{background:var(--hl)}
+
+  dialog{border:1px solid var(--ink);border-radius:8px;padding:0;max-width:560px;width:92vw;font-family:var(--sans)}
+  dialog::backdrop{background:rgba(20,18,14,.45)}
+  .dlg-h{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .dlg-h h3{margin:0;font-size:17px;line-height:1.3}
+  .dlg-b{padding:12px 16px;display:grid;gap:10px;font-size:14px}
+  .dlg-b label{display:grid;gap:3px;font-size:12px;color:var(--muted)}
+  .dlg-b input,.dlg-b select,.dlg-b textarea{border:1px solid var(--line);border-radius:4px;padding:6px 8px;color:var(--ink);font-size:14px}
+  .dlg-f{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+  .dlg-f button{padding:6px 12px;border-radius:4px;border:1px solid var(--ink);background:#fff;cursor:pointer}
+  .dlg-f button.pri{background:var(--ink);color:#fff}
+  .dlg-f button.del{border-color:var(--nd);color:var(--nd);margin-right:auto}
+  .ro p{margin:0}.ro .k{margin-bottom:2px}
+  .only-edit{display:none} body.edit .only-edit{display:inline-block}
+  .only-view{} body.edit .only-view{display:none}
+
+  /* modo presentación */
+  .pres-panel{display:none}
+  body.pres .bar > :not(.keep){display:none}
+  body.pres .cover,body.pres .filters,body.pres .run,body.pres .canvas-t{display:none}
+  body.pres .page{max-width:none;padding:10px 18px}
+  body.pres .sheet{border:0;background:transparent;padding:0}
+  body.pres .pres-wrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+  body.pres .pres-panel{display:block;position:sticky;top:60px;background:var(--paper);border:1px solid var(--ink);border-radius:8px;padding:14px 16px;font-family:var(--sans)}
+  .pres-panel h3{margin:4px 0 6px;font-size:20px;line-height:1.25}
+  .pres-panel .st{font-weight:700}
+  .pres-panel p{font-size:15px;line-height:1.45;margin:6px 0}
+  .pres-panel .hint{color:var(--muted);font-size:12.5px}
+
+  /* Rótulo (ISO 7200 / IRAM 4508): recuadro de datos del documento, abajo a la derecha de la hoja del diagrama. */
+  .rot-row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+  .rot-left{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+  .rotulo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1.5px solid var(--ink);width:min(100%,600px);font-size:12px;font-family:var(--sans)}
+  .rotulo div{border-right:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:3px 6px;min-width:0}
+  .rotulo div:nth-child(4n){border-right:0}
+  .rotulo div:nth-last-child(-n+4){border-bottom:0}
+  .rotulo .wide{grid-column:span 3}
+
+  /* Impresión: hoja 1 = portada vertical (control documental + síntesis + causas); hoja 2 = diagrama solo, apaisada.
+     Marco y márgenes según ISO 5457 / IRAM 4504: marco a 10 mm del borde y margen de archivo de 20 mm a la izquierda.
+     El tamaño de papel (A3 o A4) lo escribe el script en <style id="papel">. */
+  @media print{
+    body{background:#fff}.bar,.filters,.tip,dialog,.pres-panel{display:none!important}
+    .page{display:block;padding:0;max-width:none}
+    .sheet{border:.7mm solid var(--ink);padding:4mm 5mm;overflow:hidden}
+    .cover{page:cover;break-after:page}
+    .canvas{page:canvas;break-inside:avoid;gap:3mm}
+    .sheet > .foot,.sheet > .rot-row{margin-top:auto}
+    .sheet > .run{display:none}  /* encabezado y pie: los pone @page, con «Página n de N» */
+    body.only-diagram .cover{display:none}
+    .pres-wrap{display:block;flex:1;min-height:0}
+    .diagram{border:0;overflow:visible;height:100%}
+    svg{min-width:0;width:100%;height:100%}
+    .cover .below{grid-template-columns:1fr}
+    .cover table{font-size:13px}
+    body.a4 .cover table{font-size:10.5px}
+    body.a4 .box{font-size:12px}
+    body.a4 h1{font-size:19px}
+    tr.dim{display:table-row}.node.dim{opacity:1}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <strong class="keep">Ishikawa DiDe</strong>
+  <button type="button" id="b-edit" aria-pressed="false">Editar</button>
+  <button type="button" id="b-add" class="only-edit">+ Causa</button>
+  <button type="button" id="b-pres" class="keep" aria-pressed="false">Modo presentación</button>
+  <span class="grow keep"></span>
+  <label class="btn" for="f-imp">Importar</label><input type="file" id="f-imp" accept=".json,.csv">
+  <button type="button" id="b-json">Exportar JSON</button>
+  <button type="button" id="b-csv">Exportar CSV</button>
+  <label class="keep">Texto <select id="sel-texto" aria-label="Tamaño del texto del diagrama"><option value="auto">Automático</option><option value="S">S</option><option value="M">M</option><option value="L">L</option><option value="XL">XL</option></select></label>
+  <label>Papel <select id="sel-papel" aria-label="Tamaño de papel"><option value="A4">A4</option><option value="A3">A3</option></select></label>
+  <button type="button" id="b-print">Imprimir (portada + diagrama)</button>
+  <button type="button" id="b-print-d">Imprimir sólo el diagrama</button>
+  <button type="button" id="b-reset" class="ghost">Volver a los datos del archivo</button>
+</div>
+
+<main class="page" id="page">
+
+ <section class="sheet cover" aria-label="Portada">
+  <header class="run"><span><b data-f="codigo"></b> · Ishikawa 6M · <span data-f="titulo"></span></span><span>Versión <span data-f="version"></span> · <span data-f="fecha"></span></span></header>
+
+  <div class="head">
+    <div>
+      <p class="kicker">DiDe — Ishikawa 6M · Portada</p>
+      <h1 data-f="pregunta"></h1>
+      <p class="sub" data-f="objetivo"></p>
+      <p class="sub"><b>Efecto:</b> <span data-f="efecto"></span></p>
+    </div>
+    <div class="sema" id="sema"><span class="k">Semáforo</span><span class="dot" id="sema-dot"></span> <b id="sema-txt"></b> <select id="sema-sel" class="only-edit" aria-label="Color del semáforo"><option value="rojo">rojo</option><option value="amarillo">amarillo</option><option value="verde">verde</option></select><br><span id="sema-desc" style="color:var(--muted)"></span></div>
+  </div>
+
+  <div class="ctrl">
+    <div><span class="k">Código</span><span data-f="codigo"></span></div>
+    <div><span class="k">Versión · estado</span><span data-f="version"></span> · <span data-f="estado"></span></div>
+    <div><span class="k">Autores del contenido</span><span data-f="autores"></span></div>
+    <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+    <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+    <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+  </div>
+
+  <div class="below">
+    <div class="box" id="sintesis"></div>
+    <div class="box"><h2>Causas</h2><table><thead><tr><th>M</th><th>Causa</th><th>Autor</th><th>Estado</th><th>Nota / evidencia</th><th>Cómo se mide</th></tr></thead><tbody id="tbody"></tbody></table></div>
+  </div>
+
+  <footer class="run foot"><span>Elaboró: <span data-f="elaboro"></span> · <span data-f="fecha"></span></span><span class="foot-sema"></span><span>Portada</span></footer>
+ </section>
+
+ <section class="sheet canvas" aria-label="Diagrama">
+  <header class="run"><span><b data-f="codigo"></b> · Ishikawa 6M · <span data-f="titulo"></span></span><span>Versión <span data-f="version"></span> · <span data-f="fecha"></span></span></header>
+  <h2 class="canvas-t" data-f="pregunta"></h2>
+
+  <div class="filters" role="group" aria-label="Filtros">
+    <span class="k" style="margin:0">Estado</span>
+    <span id="fl-est"></span>
+    <label>M <select id="fl-m"><option value="">todas</option></select></label>
+    <label>Autor <select id="fl-a"><option value="">todos</option></select></label>
+  </div>
+
+  <div class="pres-wrap">
+    <div class="diagram" id="diagram"><svg id="svg" viewBox="0 0 1400 640" role="img" aria-labelledby="svg-t"><title id="svg-t">Diagrama de Ishikawa</title></svg><div class="tip" id="tip"></div></div>
+    <aside class="pres-panel" id="pres-panel" aria-live="polite"></aside>
+  </div>
+
+  <div class="rot-row">
+    <span class="rot-left">Herramienta Ishikawa DiDe (CaPI) · Hoja según ISO 5457 · Rótulo según ISO 7200</span>
+    <div class="rotulo" aria-label="Rótulo">
+      <div class="wide"><span class="k">Título</span><span data-f="titulo"></span></div>
+      <div><span class="k">Código</span><b data-f="codigo"></b></div>
+      <div><span class="k">Elaboró</span><span data-f="elaboro"></span></div>
+      <div><span class="k">Revisó</span><span data-f="reviso"></span></div>
+      <div><span class="k">Aprobó</span><span data-f="aprobo"></span></div>
+      <div><span class="k">Semáforo</span><span class="sema-name"></span></div>
+      <div><span class="k">Versión</span><span data-f="version"></span></div>
+      <div><span class="k">Fecha</span><span data-f="fecha"></span></div>
+      <div><span class="k">Estado</span><span data-f="estado"></span></div>
+      <div><span class="k">Hoja</span>ver pie de página</div>
+    </div>
+  </div>
+ </section>
+ <style id="papel"></style>
+
+</main>
+
+<dialog id="dlg" aria-labelledby="dlg-t">
+  <div class="dlg-h"><h3 id="dlg-t"></h3><button type="button" id="d-x" aria-label="Cerrar" style="border:0;background:none;font-size:20px;cursor:pointer">×</button></div>
+  <div class="dlg-b" id="dlg-b"></div>
+  <div class="dlg-f" id="dlg-f"></div>
+</dialog>
+
+<!-- DATOS: ejercicio CeSoTe (perfiles ficticios). Copia de CaPI/Herramientas/DiDe_Ishikawa.html v0.1 con estos datos. -->
+<script id="datos" type="application/json">
+{
+ "doc": {
+  "codigo": "CeSoTe-ISH-01",
+  "version": "0.1",
+  "fecha": "2026-10-05",
+  "estado": "Ejercicio · borrador",
+  "semaforo": "verde",
+  "titulo": "CeSoTe · reproducibilidad de la ruta base",
+  "pregunta": "¿Qué determina que la eficiencia de las celdas se repita entre lotes de la ruta base?",
+  "efecto": "La eficiencia de las celdas de la ruta base varía entre lotes más que la incertidumbre de medición",
+  "objetivo": "Objetivo: congelar la ruta base (revisión R2). Orden de trabajo: 1) descartar el sistema de medición; 2) tener hoja de ruta por wafer; 3) recién entonces buscar la ventana de cada paso con lotes divididos. Ejercicio CaPI con perfiles ficticios (E, R, F, Q y J).",
+  "elaboro": "J (jefa del grupo) con E, R, F y Q",
+  "reviso": "—",
+  "aprobo": "—",
+  "autores": "E, R, F, Q, J (perfiles ficticios)"
+ },
+ "causas": [
+  {
+   "id": "c01",
+   "m": "Método",
+   "texto": "No hay hoja de ruta por wafer",
+   "autor": "J",
+   "estado": "no_dominada",
+   "nota": "Si una celda sale muy bien, no se sabe con certeza qué parámetros tuvo. Es la primera causa a cerrar: sin ella, ninguna otra se puede investigar.",
+   "medicion": "% de wafers con hoja de ruta completa (meta: 100 %)"
+  },
+  {
+   "id": "c02",
+   "m": "Método",
+   "texto": "Recetas no escritas: cada corrida se ajusta a ojo",
+   "autor": "J",
+   "estado": "no_dominada",
+   "nota": "Cada paso de la ruta (DP-02) necesita su especificación de proceso, aunque sea provisoria.",
+   "medicion": "% de pasos con especificación escrita"
+  },
+  {
+   "id": "c03",
+   "m": "Método",
+   "texto": "Ventana de difusión no determinada (DP-02 paso 3)",
+   "autor": "Q",
+   "estado": "variable",
+   "nota": "Candidata a secreto industrial una vez fijada.",
+   "medicion": "Lote dividido; resistencia de lámina en 4 puntas"
+  },
+  {
+   "id": "c04",
+   "m": "Método",
+   "texto": "Perfil de recocido de contactos sin fijar (DP-02 paso 8)",
+   "autor": "Q",
+   "estado": "variable",
+   "nota": "Candidata a secreto industrial una vez fijada.",
+   "medicion": "Lote dividido; resistencia de contacto (TLM)"
+  },
+  {
+   "id": "c05",
+   "m": "Método",
+   "texto": "No está acordado qué es una celda buena (¿eficiencia, FF, Voc?)",
+   "autor": "R",
+   "estado": "no_dominada",
+   "nota": "Sin criterio de aceptación escrito no hay verificación posible.",
+   "medicion": "Criterio en la especificación de celda (drq.spc)"
+  },
+  {
+   "id": "c06",
+   "m": "Máquina",
+   "texto": "Perfil de temperatura del horno de difusión no caracterizado",
+   "autor": "Q",
+   "estado": "sin_evaluar",
+   "nota": "Los wafers de las puntas del tubo pueden difundir distinto que los del centro.",
+   "medicion": "Termocupla de perfil calibrada, a lo largo del tubo"
+  },
+  {
+   "id": "c07",
+   "m": "Máquina",
+   "texto": "El espesor evaporado depende de la posición en el portamuestras",
+   "autor": "F",
+   "estado": "variable",
+   "nota": "Afecta la resistencia de los dedos (DP-02 paso 7).",
+   "medicion": "Perfilómetro sobre testigos en distintas posiciones"
+  },
+  {
+   "id": "c08",
+   "m": "Máquina",
+   "texto": "Deriva de la lámpara del simulador entre sesiones",
+   "autor": "F",
+   "estado": "variable",
+   "nota": "Puede parecer variación del proceso y ser variación de la medición.",
+   "medicion": "Celda testigo medida al comenzar cada sesión"
+  },
+  {
+   "id": "c09",
+   "m": "Materiales",
+   "texto": "Wafers de distintos lotes del proveedor",
+   "autor": "Q",
+   "estado": "variable",
+   "nota": "Resistividad y tiempo de vida distintos entre lotes de compra.",
+   "medicion": "Medir resistividad y tiempo de vida al recibir (DP-02 paso 1)"
+  },
+  {
+   "id": "c10",
+   "m": "Materiales",
+   "texto": "Calidad del agua y de los químicos de limpieza",
+   "autor": "E",
+   "estado": "sin_evaluar",
+   "nota": "La contaminación metálica baja el tiempo de vida.",
+   "medicion": "Resistividad del agua desionizada; certificado de cada químico"
+  },
+  {
+   "id": "c11",
+   "m": "Materiales",
+   "texto": "Estado del dopante líquido (fecha de apertura, humedad)",
+   "autor": "Q",
+   "estado": "sin_evaluar",
+   "nota": "",
+   "medicion": "Registrar fecha de apertura en la hoja de ruta"
+  },
+  {
+   "id": "c12",
+   "m": "Medición",
+   "texto": "Celda de referencia sin calibración trazable vigente",
+   "autor": "F",
+   "estado": "no_dominada",
+   "nota": "Sin trazabilidad, el valor absoluto de eficiencia no tiene respaldo.",
+   "medicion": "Certificado de calibración de un laboratorio acreditado"
+  },
+  {
+   "id": "c13",
+   "m": "Medición",
+   "texto": "Incertidumbre de la medición I-V no declarada",
+   "autor": "J",
+   "estado": "no_dominada",
+   "nota": "Hay que saber cuánto varía la medición sola antes de culpar al proceso.",
+   "medicion": "Estudio de repetibilidad y reproducibilidad del sistema de medición"
+  },
+  {
+   "id": "c14",
+   "m": "Medición",
+   "texto": "El área de la celda se mide con distinto criterio",
+   "autor": "F",
+   "estado": "variable",
+   "nota": "El error de área pasa directo a la eficiencia.",
+   "medicion": "Patrón de medida; criterio escrito (DP-02 paso 9)"
+  },
+  {
+   "id": "c15",
+   "m": "Medición",
+   "texto": "Temperatura de la celda durante la medición no controlada",
+   "autor": "F",
+   "estado": "variable",
+   "nota": "La norma pide 25 °C.",
+   "medicion": "Sensor en el soporte; registrar en cada medición"
+  },
+  {
+   "id": "c16",
+   "m": "Mano de obra",
+   "texto": "Cada doctorando opera distinto",
+   "autor": "J",
+   "estado": "variable",
+   "nota": "Manipulación, tiempos y orden de las tareas.",
+   "medicion": "Registrar quién operó en la hoja de ruta; comparar"
+  },
+  {
+   "id": "c17",
+   "m": "Mano de obra",
+   "texto": "Tiempo de espera entre pasos no registrado",
+   "autor": "Q",
+   "estado": "sin_evaluar",
+   "nota": "Entre limpieza y difusión, la superficie se oxida o se contamina.",
+   "medicion": "Hora de salida y de entrada en la hoja de ruta"
+  },
+  {
+   "id": "c18",
+   "m": "Medio ambiente",
+   "texto": "Partículas y humedad de la sala limpia sin monitorear",
+   "autor": "E",
+   "estado": "sin_evaluar",
+   "nota": "Clase según ISO 14644-1.",
+   "medicion": "Contador de partículas e higrómetro; registro por corrida"
+  },
+  {
+   "id": "c19",
+   "m": "Medio ambiente",
+   "texto": "Bancos húmedos compartidos con otros grupos",
+   "autor": "E",
+   "estado": "sin_evaluar",
+   "nota": "Riesgo de contaminación cruzada.",
+   "medicion": "Registro de uso de cada banco"
+  }
+ ]
+}
+</script>
+
+<script>
+(function(){
+  var MS=["Método","Máquina","Materiales","Medición","Mano de obra","Medio ambiente"];
+  var EST={controlada:{t:"Controlada",c:"var(--ok)",h:"#2e7d32"},variable:{t:"Variable",c:"var(--var)",h:"#b58500"},no_dominada:{t:"No dominada",c:"var(--nd)",h:"#b3261e"},sin_evaluar:{t:"Sin evaluar",c:"var(--se)",h:"#8a8578"}};
+  var SEMA={rojo:{h:"#b3261e",d:"Sólo autores y capacitadora."},amarillo:{h:"#b58500",d:"Todo el grupo."},verde:{h:"#2e7d32",d:"Público."}};
+  var ORIG=JSON.parse(document.getElementById('datos').textContent), D, KEY;
+  var $=function(id){return document.getElementById(id);};
+  var NS="http://www.w3.org/2000/svg";
+  var filt={est:{controlada:true,variable:true,no_dominada:true,sin_evaluar:true},m:"",a:""};
+  var sel=null;
+
+  // Preferencias de este navegador: papel y tamaño de texto.
+  var pref={papel:'A4',texto:'auto'};
+  try{var ps=JSON.parse(localStorage.getItem('dide-ish-pref')||'null');if(ps)pref=Object.assign(pref,ps);}catch(e){}
+  function savePref(){try{localStorage.setItem('dide-ish-pref',JSON.stringify(pref));}catch(e){}}
+
+  // Hojas según ISO 216 (mm) y márgenes según ISO 5457: 10 mm, y 20 mm a la izquierda para archivar.
+  var PAPEL={A3:{cover:[297,420],canvas:[420,297]},A4:{cover:[210,297],canvas:[297,210]}};
+  // texto seguro para la propiedad content de CSS (encabezado y pie de cada hoja impresa)
+  function cssStr(s){return '"'+String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/[\r\n]+/g,' ')+'"';}
+  function applyPaper(){
+    var p=PAPEL[pref.papel]||PAPEL.A4,m='10mm 10mm 10mm 20mm',d=D?D.doc:{},s=SEMA[d.semaforo]||SEMA.rojo;
+    var box='font-family:Consolas,monospace;font-size:8pt;color:#444;vertical-align:middle;';
+    $('papel').textContent=
+      '@page{@top-left{content:'+cssStr((d.codigo||'')+' · Ishikawa 6M DiDe · '+(d.titulo||''))+';'+box+'}'+
+      '@top-right{content:'+cssStr('Versión '+(d.version||'')+' · '+(d.fecha||''))+';'+box+'}'+
+      '@bottom-left{content:'+cssStr('Elaboró: '+(d.elaboro||'')+' · Semáforo: '+(d.semaforo||'')+' — '+s.d)+';'+box+'}'+
+      '@bottom-right{content:"Página " counter(page) " de " counter(pages);'+box+'}}'+
+      '@page cover{size:'+pref.papel+' portrait;margin:'+m+'}'+
+      '@page canvas{size:'+pref.papel+' landscape;margin:'+m+'}'+
+      '@media print{.cover{height:'+(p.cover[1]-21)+'mm}.canvas{height:'+(p.canvas[1]-21)+'mm}}';
+    document.body.classList.toggle('a4',pref.papel==='A4');
+    $('sel-papel').value=pref.papel;$('sel-texto').value=pref.texto;
+  }
+
+  function clone(o){return JSON.parse(JSON.stringify(o));}
+  function load(){
+    KEY='dide-ish-'+(ORIG.doc.codigo||'x');
+    D=clone(ORIG);
+    try{var s=localStorage.getItem(KEY);if(s){D=JSON.parse(s);}}catch(e){}
+  }
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(D));}catch(e){}}
+  function el(tag,attrs,txt){var e=document.createElementNS(NS,tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(txt!=null)e.textContent=txt;return e;}
+  function visible(c){return filt.est[c.estado]!==false&&(!filt.m||c.m===filt.m)&&(!filt.a||c.autor===filt.a);}
+  function trunc(s,n){return s.length>n?s.slice(0,n-1)+'…':s;}
+  function wrap(s,n){var w=s.split(/\s+/),out=[],cur='';w.forEach(function(x){if((cur+' '+x).trim().length>n){if(cur)out.push(cur);cur=x;}else cur=(cur+' '+x).trim();});if(cur)out.push(cur);return out;}
+
+  function renderDoc(){
+    document.querySelectorAll('[data-f]').forEach(function(e){e.textContent=D.doc[e.dataset.f]||'';});
+    var s=SEMA[D.doc.semaforo]||SEMA.rojo;
+    $('sema').style.borderColor=s.h;$('sema-dot').style.background=s.h;$('sema-txt').textContent=D.doc.semaforo;$('sema-txt').style.color=s.h;
+    $('sema-desc').textContent=s.d;$('sema-sel').value=D.doc.semaforo;
+    document.querySelectorAll('.foot-sema').forEach(function(e){e.textContent='Semáforo: '+D.doc.semaforo+' — '+s.d;});
+    document.querySelectorAll('.sema-name').forEach(function(e){e.textContent=D.doc.semaforo+' — '+s.d;e.style.color=s.h;});
+    document.title='Ishikawa — '+(D.doc.titulo||'');
+    applyPaper();  // el encabezado y el pie de cada hoja impresa usan estos datos
+  }
+
+  // Tamaño del texto del diagrama: "auto" elige según la espina con más causas; S/M/L/XL lo fija a mano.
+  var SIZES={S:12,M:14,L:17,XL:20}, H=820;
+  function fontSize(){
+    if(pref.texto!=='auto')return SIZES[pref.texto];
+    var max=1;MS.forEach(function(m){var n=D.causas.filter(function(c){return c.m===m;}).length;if(n>max)max=n;});
+    var sp=(H/2-120)/(max+1);
+    return Math.max(SIZES.S,Math.min(SIZES.XL,Math.floor(sp/2.4)));
+  }
+  function txt(x,y,lines,fs,cls,attrs){
+    var t=el('text',Object.assign({x:x,y:y,'class':cls},attrs||{}));t.style.fontSize=fs+'px';
+    lines.forEach(function(l,i){var s=el('tspan',{x:x,dy:i?fs*1.2:0},l);t.appendChild(s);});
+    return t;
+  }
+
+  function renderSVG(){
+    var svg=$('svg');while(svg.childNodes.length>1)svg.removeChild(svg.lastChild);
+    svg.setAttribute('viewBox','0 0 1400 '+H);
+    var SY=H/2,X0=40,X1=1090,fs=fontSize(),chars=Math.max(14,Math.round(300/(0.52*fs)));
+    svg.appendChild(el('line',{x1:X0,y1:SY,x2:X1,y2:SY,'class':'spine'}));
+    svg.appendChild(el('polygon',{points:(X1)+','+(SY-12)+' '+(X1+22)+','+SY+' '+(X1)+','+(SY+12),fill:'#1b1a16'}));
+    var hfs=fs+2,hl=wrap(D.doc.efecto||'',Math.max(12,Math.round(225/(0.55*hfs)))).slice(0,10),bh=46+hl.length*hfs*1.25+18;
+    svg.appendChild(el('rect',{x:1118,y:SY-bh/2,width:272,height:bh,rx:10,'class':'headbox'}));
+    svg.appendChild(el('text',{x:1136,y:SY-bh/2+26,'font-size':12,fill:'#b3261e','font-family':'Consolas,monospace'},'EFECTO'));
+    var ht=txt(1136,SY-bh/2+26+hfs*1.4,hl,hfs,'headtxt');svg.appendChild(ht);
+    var BX=[250,610,970];
+    MS.forEach(function(m,i){
+      var top=i<3,bx=BX[i%3],y0=top?80:H-80,x1=bx+130;
+      svg.appendChild(el('line',{x1:bx,y1:y0,x2:x1,y2:SY,'class':'bone'}));
+      svg.appendChild(txt(bx,top?54:H-42,[m.toUpperCase()],fs+3,'cat'));
+      var cs=D.causas.filter(function(c){return c.m===m;});
+      cs.forEach(function(c,j){
+        var t=(j+1)/(cs.length+1),x=bx+130*t,y=y0+(SY-y0)*t;
+        var g=el('g',{'class':'node'+(visible(c)?'':' dim')+(sel===c.id?' sel':''),tabindex:0,role:'button','aria-label':m+': '+c.texto+' — '+EST[c.estado].t});
+        var e=EST[c.estado]||EST.sin_evaluar,r=Math.max(7,fs*0.6);
+        g.appendChild(el('circle',{cx:x,cy:y,r:r,fill:c.estado==='sin_evaluar'?'#fff':e.h,stroke:c.estado==='sin_evaluar'?e.h:'#fff','stroke-width':c.estado==='sin_evaluar'?2.5:2}));
+        // El texto va a la izquierda del nodo: en la primera espina no puede pasar el borde izquierdo del dibujo.
+        var cc=Math.max(8,Math.min(chars,Math.floor((x-r-7-8)/(0.52*fs))));
+        var ls=wrap(c.texto,cc);if(ls.length>2){ls=ls.slice(0,2);ls[1]=trunc(ls[1]+' …',cc);}
+        g.appendChild(txt(x-r-7,y+fs*0.35-(ls.length-1)*fs*0.6,ls,fs,'lbl'));
+        g.addEventListener('mouseenter',function(ev){tip(c,ev);});
+        g.addEventListener('mousemove',function(ev){tip(c,ev);});
+        g.addEventListener('mouseleave',function(){$('tip').style.display='none';});
+        g.addEventListener('click',function(){choose(c.id);});
+        g.addEventListener('keydown',function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();choose(c.id);}});
+        svg.appendChild(g);
+      });
+    });
+  }
+
+  function tip(c,ev){
+    var t=$('tip'),r=$('diagram').getBoundingClientRect();
+    t.innerHTML='';var b=document.createElement('b');b.textContent=c.texto;t.appendChild(b);
+    t.appendChild(document.createElement('br'));
+    t.appendChild(document.createTextNode(EST[c.estado].t+(c.autor?' · '+c.autor:'')));
+    if(c.nota){t.appendChild(document.createElement('br'));t.appendChild(document.createTextNode(c.nota));}
+    t.style.display='block';
+    t.style.left=Math.min(ev.clientX-r.left+14,r.width-310)+'px';t.style.top=(ev.clientY-r.top+14)+'px';
+  }
+
+  function renderTable(){
+    var tb=$('tbody');tb.innerHTML='';
+    MS.forEach(function(m){D.causas.filter(function(c){return c.m===m;}).forEach(function(c){
+      var tr=document.createElement('tr');if(!visible(c))tr.className='dim';
+      [m,c.texto,c.autor||'',null,c.nota||'',c.medicion||''].forEach(function(v,i){
+        var td=document.createElement('td');
+        if(i===3){var d=document.createElement('span');d.className='dot d-'+c.estado;td.appendChild(d);td.appendChild(document.createTextNode(EST[c.estado].t));}
+        else td.textContent=v;
+        tr.appendChild(td);});
+      tr.addEventListener('click',function(){choose(c.id);});
+      tb.appendChild(tr);});});
+  }
+
+  function renderSintesis(){
+    var n=D.causas.length,cnt={};Object.keys(EST).forEach(function(k){cnt[k]=D.causas.filter(function(c){return c.estado===k;}).length;});
+    var box=$('sintesis');box.innerHTML='<h2>Síntesis (se calcula sola)</h2>';
+    var bars=document.createElement('div');bars.className='bars';
+    Object.keys(EST).forEach(function(k){if(!cnt[k])return;var s=document.createElement('span');s.style.width=(100*cnt[k]/n)+'%';s.style.background=EST[k].h;s.title=EST[k].t+': '+cnt[k];bars.appendChild(s);});
+    box.appendChild(bars);
+    var p=document.createElement('p');
+    p.textContent=n+' causas: '+cnt.controlada+' controladas, '+cnt.variable+' variables, '+cnt.no_dominada+' no dominadas y '+cnt.sin_evaluar+' sin evaluar.';
+    box.appendChild(p);
+    var nd=D.causas.filter(function(c){return c.estado==='no_dominada';});
+    if(nd.length){var q=document.createElement('p');q.innerHTML='<b>No dominadas → ahí se mide, ahí se certifica:</b> ';q.appendChild(document.createTextNode(nd.map(function(c){return c.texto;}).join(' · ')));box.appendChild(q);}
+    var se=D.causas.filter(function(c){return c.estado==='sin_evaluar';});
+    if(se.length){var r=document.createElement('p');r.innerHTML='<b>Preguntas para el grupo:</b> ';r.appendChild(document.createTextNode(se.length+' causas sin evaluar.'));box.appendChild(r);}
+  }
+
+  function renderFilters(){
+    var fe=$('fl-est');fe.innerHTML='';
+    Object.keys(EST).forEach(function(k){
+      var b=document.createElement('button');b.type='button';b.className='chip';b.setAttribute('aria-pressed',String(filt.est[k]));
+      b.innerHTML='<span class="dot d-'+k+'"></span>';b.appendChild(document.createTextNode(EST[k].t));
+      b.addEventListener('click',function(){filt.est[k]=!filt.est[k];renderAll();});fe.appendChild(b);});
+    var fm=$('fl-m'),fa=$('fl-a'),av=fa.value;
+    if(fm.options.length===1)MS.forEach(function(m){var o=document.createElement('option');o.value=o.textContent=m;fm.appendChild(o);});
+    fa.innerHTML='<option value="">todos</option>';
+    Array.from(new Set(D.causas.map(function(c){return c.autor||'';}).filter(Boolean))).sort().forEach(function(a){var o=document.createElement('option');o.value=o.textContent=a;fa.appendChild(o);});
+    fa.value=av;
+  }
+
+  function renderPanel(){
+    var p=$('pres-panel'),c=D.causas.find(function(x){return x.id===sel;});
+    p.innerHTML='';
+    if(!c){p.innerHTML='<p class="hint">Tocá una causa del diagrama, o usá las flechas ← → para recorrerlas.</p>';return;}
+    var e=EST[c.estado];
+    p.innerHTML='<span class="k">'+c.m+'</span>';
+    var h=document.createElement('h3');h.textContent=c.texto;h.style.color=e.h;p.appendChild(h);
+    var st=document.createElement('p');st.className='st';st.style.color=e.h;st.textContent=e.t+(c.autor?' · aportó '+c.autor:'');p.appendChild(st);
+    if(c.nota){var n=document.createElement('p');n.textContent=c.nota;p.appendChild(n);}
+    if(c.medicion){var m=document.createElement('p');m.innerHTML='<b>Cómo se mide:</b> ';m.appendChild(document.createTextNode(c.medicion));p.appendChild(m);}
+    var hint=document.createElement('p');hint.className='hint';hint.textContent='← → para recorrer · Esc para salir';p.appendChild(hint);
+  }
+
+  function renderAll(){renderDoc();renderFilters();renderSVG();renderTable();renderSintesis();renderPanel();}
+
+  function choose(id){
+    sel=id;
+    if(document.body.classList.contains('pres')){renderSVG();renderPanel();return;}
+    openDlg(D.causas.find(function(c){return c.id===id;}));
+  }
+
+  function openDlg(c){
+    var isNew=!c, edit=document.body.classList.contains('edit')||isNew;
+    if(isNew)c={id:'c'+Date.now(),m:MS[0],texto:'',autor:'',estado:'sin_evaluar',nota:'',medicion:''};
+    $('dlg-t').textContent=isNew?'Nueva causa':c.texto;
+    var b=$('dlg-b'),f=$('dlg-f');b.innerHTML='';f.innerHTML='';
+    if(!edit){
+      b.className='dlg-b ro';
+      [['M',c.m],['Estado',EST[c.estado].t],['Aportó',c.autor||'—'],['Nota / evidencia',c.nota||'—'],['Cómo se mide',c.medicion||'—']].forEach(function(r){
+        var d=document.createElement('div');d.innerHTML='<span class="k"></span><p></p>';d.firstChild.textContent=r[0];d.lastChild.textContent=r[1];b.appendChild(d);});
+      addBtn(f,'Cerrar','pri',function(){$('dlg').close();});
+    }else{
+      b.className='dlg-b';
+      var inp={};
+      function field(lbl,key,type,opts){var l=document.createElement('label');l.textContent=lbl;var i;
+        if(type==='select'){i=document.createElement('select');opts.forEach(function(o){var op=document.createElement('option');op.value=o[0];op.textContent=o[1];i.appendChild(op);});}
+        else if(type==='area'){i=document.createElement('textarea');i.rows=3;}else{i=document.createElement('input');i.type='text';}
+        i.id='fld-'+key;i.value=c[key]||'';l.appendChild(i);b.appendChild(l);inp[key]=i;}
+      field('M','m','select',MS.map(function(m){return[m,m];}));
+      field('Causa','texto','text');
+      field('Aportó (inicial o nombre)','autor','text');
+      field('Estado','estado','select',Object.keys(EST).map(function(k){return[k,EST[k].t];}));
+      field('Nota / evidencia','nota','area');
+      field('Cómo se mide','medicion','area');
+      if(!isNew)addBtn(f,'Borrar','del',function(){D.causas=D.causas.filter(function(x){return x.id!==c.id;});save();$('dlg').close();renderAll();});
+      addBtn(f,'Cancelar','',function(){$('dlg').close();});
+      addBtn(f,'Guardar','pri',function(){
+        if(!inp.texto.value.trim()){inp.texto.focus();return;}
+        Object.keys(inp).forEach(function(k){c[k]=inp[k].value.trim();});
+        if(isNew)D.causas.push(c);save();$('dlg').close();renderAll();});
+    }
+    $('dlg').showModal();
+  }
+  function addBtn(f,t,cls,fn){var x=document.createElement('button');x.type='button';x.textContent=t;if(cls)x.className=cls;x.addEventListener('click',fn);f.appendChild(x);}
+
+  // edición de los campos del documento
+  document.querySelectorAll('[data-f]').forEach(function(e){
+    e.addEventListener('input',function(){D.doc[e.dataset.f]=e.textContent;save();
+      document.querySelectorAll('[data-f="'+e.dataset.f+'"]').forEach(function(o){if(o!==e)o.textContent=e.textContent;});applyPaper();});});
+  $('sema-sel').addEventListener('change',function(){D.doc.semaforo=this.value;save();renderDoc();});
+  $('b-edit').addEventListener('click',function(){
+    var on=!document.body.classList.contains('edit');document.body.classList.toggle('edit',on);this.setAttribute('aria-pressed',String(on));
+    document.querySelectorAll('[data-f]').forEach(function(e){e.contentEditable=on?'true':'false';});});
+  $('b-add').addEventListener('click',function(){openDlg(null);});
+  $('d-x').addEventListener('click',function(){$('dlg').close();});
+  $('fl-m').addEventListener('change',function(){filt.m=this.value;renderAll();});
+  $('fl-a').addEventListener('change',function(){filt.a=this.value;renderAll();});
+
+  // modo presentación
+  function pres(on){document.body.classList.toggle('pres',on);$('b-pres').setAttribute('aria-pressed',String(on));$('b-pres').textContent=on?'Salir de la presentación':'Modo presentación';
+    if(on&&!sel){var v=D.causas.filter(visible);sel=v.length?v[0].id:null;}renderAll();
+    if(on&&document.documentElement.requestFullscreen){document.documentElement.requestFullscreen().catch(function(){});}
+    if(!on&&document.fullscreenElement){document.exitFullscreen().catch(function(){});}}
+  $('b-pres').addEventListener('click',function(){pres(!document.body.classList.contains('pres'));});
+  document.addEventListener('keydown',function(ev){
+    if(!document.body.classList.contains('pres'))return;
+    if(ev.key==='Escape'){pres(false);return;}
+    if(ev.key!=='ArrowRight'&&ev.key!=='ArrowLeft')return;
+    var order=[];MS.forEach(function(m){D.causas.forEach(function(c){if(c.m===m&&visible(c))order.push(c.id);});});
+    if(!order.length)return;var i=order.indexOf(sel);
+    i=ev.key==='ArrowRight'?(i+1)%order.length:(i-1+order.length)%order.length;sel=order[i];renderSVG();renderPanel();});
+  document.addEventListener('fullscreenchange',function(){if(!document.fullscreenElement&&document.body.classList.contains('pres'))pres(false);});
+
+  // exportar / importar
+  function slug(){return (D.doc.codigo||'ishikawa').replace(/[^A-Za-z0-9._-]+/g,'_');}
+  function download(name,text,type){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  var COLS=['id','m','texto','autor','estado','nota','medicion'];
+  function csvCell(v){v=String(v==null?'':v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
+  $('b-json').addEventListener('click',function(){download(slug()+'.json',JSON.stringify(D,null,2),'application/json');});
+  $('b-csv').addEventListener('click',function(){
+    var rows=[COLS.join(';')].concat(D.causas.map(function(c){return COLS.map(function(k){return csvCell(c[k]);}).join(';');}));
+    download(slug()+'_causas.csv','﻿'+rows.join('\n'),'text/csv');});
+  function parseCSV(t){
+    var rows=[],row=[],cell='',q=false;t=t.replace(/^﻿/,'');
+    for(var i=0;i<t.length;i++){var ch=t[i];
+      if(q){if(ch==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=ch;}
+      else if(ch==='"')q=true;else if(ch===';'){row.push(cell);cell='';}
+      else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell='';}
+      else cell+=ch;}
+    if(cell||row.length){row.push(cell);rows.push(row);}
+    var h=rows.shift().map(function(x){return x.trim().toLowerCase();});
+    return rows.filter(function(r){return r.join('').trim();}).map(function(r,j){var o={};h.forEach(function(k,i){o[k]=(r[i]||'').trim();});
+      if(!o.id)o.id='c'+(j+1);if(!EST[o.estado])o.estado='sin_evaluar';return o;});
+  }
+  $('f-imp').addEventListener('change',function(){
+    var file=this.files[0];if(!file)return;var rd=new FileReader();
+    rd.onload=function(){try{
+      if(/\.csv$/i.test(file.name)){D.causas=parseCSV(rd.result);}
+      else{var o=JSON.parse(rd.result);if(!o.doc||!o.causas)throw new Error('Faltan "doc" o "causas"');D=o;}
+      save();sel=null;renderAll();
+    }catch(e){$('dlg-t').textContent='No se pudo importar';$('dlg-b').className='dlg-b';$('dlg-b').textContent='Revisá el formato del archivo: '+e.message;$('dlg-f').innerHTML='';addBtn($('dlg-f'),'Cerrar','pri',function(){$('dlg').close();});$('dlg').showModal();}};
+    rd.readAsText(file,'utf-8');this.value='';});
+  $('b-print').addEventListener('click',function(){document.body.classList.remove('only-diagram');window.print();});
+  $('b-print-d').addEventListener('click',function(){document.body.classList.add('only-diagram');window.print();});
+  window.addEventListener('afterprint',function(){document.body.classList.remove('only-diagram');});
+  $('b-reset').addEventListener('click',function(){
+    $('dlg-t').textContent='Volver a los datos del archivo';$('dlg-b').className='dlg-b';
+    $('dlg-b').textContent='Se pierden los cambios guardados en este navegador. Exportá un JSON antes si los querés conservar.';
+    $('dlg-f').innerHTML='';addBtn($('dlg-f'),'Cancelar','',function(){$('dlg').close();});
+    addBtn($('dlg-f'),'Volver a los datos','del',function(){try{localStorage.removeItem(KEY);}catch(e){}D=clone(ORIG);sel=null;$('dlg').close();renderAll();});
+    $('dlg').showModal();});
+
+  $('sel-papel').addEventListener('change',function(){pref.papel=this.value;savePref();applyPaper();});
+  $('sel-texto').addEventListener('change',function(){pref.texto=this.value;savePref();renderSVG();});
+
+  load();applyPaper();renderAll();
+})();
+</script>
+</body>
+</html>
